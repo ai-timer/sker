@@ -1,0 +1,15 @@
+[package]
+name = "sker-schema"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml_ng.workspace = true
+blake3.workspace = true
+rkyv.workspace = true
+schemars.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true

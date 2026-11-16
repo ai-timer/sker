@@ -1,0 +1,22 @@
+[package]
+name = "sker-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "sker"
+path = "src/main.rs"
+
+[dependencies]
+sker-schema = { path = "../sker-schema" }
+sker-compiler = { path = "../sker-compiler" }
+sker-analyzer = { path = "../sker-analyzer" }
+sker-retriever = { path = "../sker-retriever" }
+sker-mcp = { path = "../sker-mcp" }
+clap.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml_ng.workspace = true
+anyhow.workspace = true

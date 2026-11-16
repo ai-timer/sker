@@ -1,0 +1,1 @@
+// Sker polyglot diff analyzer

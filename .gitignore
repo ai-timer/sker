@@ -1,0 +1,40 @@
+# === Rust / Cargo ===
+/target/
+**/*.rs.bk
+*.pdb
+# 注意：本仓库包含可执行二进制 (sker-cli / sker-ledger)，
+# 必须保留 Cargo.lock 进 Git 以保证构建可重现，不要忽略 Cargo.lock。
+
+# === Sker 本地缓存与临时报告（保留 .sker.yaml / .sker.lock / rules / baseline）===
+.sker/cache/
+.sker/tmp/
+.sker/*.rkyv
+.sker/*.sha256
+*.sarif
+sker-report.json
+
+# === 环境变量与 Ledger 本地数据库卷 ===
+.env
+.env.*
+!.env.example
+pgdata/
+*.sqlite
+*.sqlite3
+
+# === macOS & 编辑器 ===
+.DS_Store
+.AppleDouble
+.LSOverride
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+*.swo
+*~
+
+# === 临时测试与构建产物 ===
+dist/
+coverage/
+*.log

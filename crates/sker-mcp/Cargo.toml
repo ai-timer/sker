@@ -1,0 +1,16 @@
+[package]
+name = "sker-mcp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+sker-schema = { path = "../sker-schema" }
+sker-retriever = { path = "../sker-retriever" }
+rmcp.workspace = true
+schemars.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
