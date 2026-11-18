@@ -1,0 +1,31 @@
+services:
+  ledger:
+    build:
+      context: ../..
+      dockerfile: apps/sker-ledger/Dockerfile
+    environment:
+      DATABASE_URL: postgres://sker:sker@postgres:5432/sker_ledger
+      LISTEN_ADDR: 0.0.0.0:8080
+      LEDGER_BEARER_TOKEN: ${LEDGER_BEARER_TOKEN:?Set LEDGER_BEARER_TOKEN before starting the ledger}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: sker
+      POSTGRES_PASSWORD: sker
+      POSTGRES_DB: sker_ledger
+    volumes:
+      - ledger-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sker -d sker_ledger"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+volumes:
+  ledger-db:
