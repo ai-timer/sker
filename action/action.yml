@@ -1,0 +1,87 @@
+name: Sker PR governance gate
+description: Recompute Sker policy checks and publish SARIF and a compliance matrix.
+author: Sker maintainers
+inputs:
+  sker-path:
+    description: Path to the installed sker executable.
+    required: false
+    default: sker
+  sarif-file:
+    description: SARIF output path.
+    required: false
+    default: sker-results.sarif
+  report-file:
+    description: CheckReport JSON output path.
+    required: false
+    default: sker-check-report.json
+  credential-file:
+    description: Path to a locally issued Agent credential, if present.
+    required: false
+    default: .sker/credential.json
+  protected-agent-label:
+    description: Protected PR label indicating Agent participation.
+    required: false
+    default: agent-authored
+  ledger-url:
+    description: Optional Ledger event endpoint.
+    required: false
+    default: ''
+  ledger-token:
+    description: Optional Ledger bearer token.
+    required: false
+    default: ''
+runs:
+  using: composite
+  steps:
+    - name: Classify PR
+      id: classify
+      shell: bash
+      env:
+        INPUT_CREDENTIAL_FILE: ${{ inputs.credential-file }}
+        INPUT_AGENT_LABEL: ${{ inputs.protected-agent-label }}
+        GH_EVENT_PATH: ${{ github.event_path }}
+      run: bash "${{ github.action_path }}/scripts/classify-pr.sh"
+    - name: Run Sker CI check
+      id: sker-check
+      shell: bash
+      env:
+        INPUT_SKER_PATH: ${{ inputs.sker-path }}
+        INPUT_SARIF_FILE: ${{ inputs.sarif-file }}
+        INPUT_REPORT_FILE: ${{ inputs.report-file }}
+      run: bash "${{ github.action_path }}/scripts/run-check.sh"
+      continue-on-error: true
+    - name: Install BLAKE3 verifier
+      if: always() && steps.classify.outputs.actor == 'agent'
+      uses: taiki-e/install-action@v2
+      with:
+        tool: b3sum
+    - name: Validate Agent credential and gate
+      if: always()
+      shell: bash
+      env:
+        INPUT_CREDENTIAL_FILE: ${{ inputs.credential-file }}
+        INPUT_REPORT_FILE: ${{ inputs.report-file }}
+        SKER_EXIT_CODE: ${{ steps.sker-check.outputs.exit_code }}
+        SKER_ACTOR: ${{ steps.classify.outputs.actor }}
+      run: bash "${{ github.action_path }}/scripts/verify-pr.sh"
+    - name: Upload SARIF
+      if: always() && hashFiles(inputs.sarif-file) != ''
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ inputs.sarif-file }}
+    - name: Publish compliance matrix and self-check card
+      if: always() && github.event_name == 'pull_request'
+      shell: bash
+      env:
+        INPUT_REPORT_FILE: ${{ inputs.report-file }}
+        INPUT_SARIF_FILE: ${{ inputs.sarif-file }}
+        GH_TOKEN: ${{ github.token }}
+      run: bash "${{ github.action_path }}/scripts/report-pr.sh"
+    - name: Post sanitized Ledger event (fail open)
+      if: always() && inputs.ledger-url != ''
+      shell: bash
+      env:
+        INPUT_LEDGER_URL: ${{ inputs.ledger-url }}
+        INPUT_LEDGER_TOKEN: ${{ inputs.ledger-token }}
+        INPUT_REPORT_FILE: ${{ inputs.report-file }}
+      run: bash "${{ github.action_path }}/scripts/post-ledger-event.sh"
