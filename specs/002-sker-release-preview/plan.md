@@ -16,6 +16,10 @@ Deliver an offline-first, auditable Rust workspace for compiling locked policy s
 
 **Storage**: Local repository/config/bundle files for core workflows; optional governance ledger uses PostgreSQL through the existing SQLx dependency.
 
+**Ledger deployment boundary**: `apps/sker-ledger` is a stateless single application container built from `apps/sker-ledger/Dockerfile` and connects to an external PostgreSQL 16+ instance in deployed environments. `apps/sker-ledger/docker-compose.yml` additionally defines a companion `postgres:16` service for local/Preview one-command startup; it is a development composition, not a claim that PostgreSQL is embedded in the application container. The app exposes an unauthenticated internal `/healthz` check that succeeds only when its database connection is healthy.
+
+**CLI/Action boundary**: `contracts/cli-ci.json` is the frozen interface between `sker-cli` and `action/`: `sker check --ci --sarif <path> --json <path>`, exit codes 0/1/2, atomic SARIF/CheckReport outputs, and the CheckReport JSON schema. Lane F may implement against this contract and fixtures while Lane E is in progress; Phase 4 performs the real-binary integration.
+
 **Testing**: `cargo test --workspace` and `cargo clippy --workspace -- -D warnings`; unit and boundary tests per crate, positive and negative fixtures per deterministic rule. Commands are documented in quickstart; they are not run during planning.
 
 **Target Platform**: Blocking Preview v0.1 release/acceptance targets: macOS arm64/x86_64 and Linux x86_64/arm64. Windows remains pure-Rust/no-C-dependency source-compatible but is not a blocking Preview v0.1 target.
@@ -89,7 +93,7 @@ crates/
 apps/
 └── sker-ledger/       # Optional asynchronous governance service
 specs/002-sker-release-preview/
-├── contracts/         # CLI, MCP, CI/SARIF, hook, and telemetry contracts
+├── contracts/         # CLI CI, crate traits, MCP, SARIF, hook, and telemetry contracts
 ├── data-model.md
 ├── quickstart.md
 ├── research.md

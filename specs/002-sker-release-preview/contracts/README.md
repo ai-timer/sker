@@ -5,11 +5,14 @@ This document defines provider-neutral observable contracts. Shared Rust structu
 Frozen contract files:
 
 - [crate-traits.rs](crate-traits.rs): cross-crate trait signatures and shared error enum declarations.
+- [cli-ci.json](cli-ci.json): frozen CI invocation, exit-code semantics, atomic output rule, and CheckReport JSON Schema.
 - [entry-schema.json](entry-schema.json): complete v1 Entry schema for YAML rule entries.
 - [mcp-tools.json](mcp-tools.json): `sker_consult`, `sker_search`, `sker_attest`, and `sker_propose` input/output schemas. Its `sker_propose.entry` reference resolves to the co-shipped `entry-schema.json`; implementations use this bundled schema and do not fetch it over the network.
 - [ledger-openapi.yaml](ledger-openapi.yaml): governance event ingest and read-only metrics/health API.
 
 ## CLI
+
+The CI check invocation and machine-readable result are frozen in [cli-ci.json](cli-ci.json). Lane F MUST implement against that contract and its fixtures without depending on the Lane E binary; Phase 4 performs binary integration. The CI invocation is `sker check --ci --sarif <path> --json <path>`; exit code 0 means complete/no deterministic BLOCK, 1 means complete/blocked, and 2 means incomplete or invocation/output failure.
 
 The `sker` executable exposes these operations:
 
@@ -18,7 +21,7 @@ The `sker` executable exposes these operations:
 | `init` | Repository root and detected host/languages | Idempotent project configuration and managed guidance blocks |
 | `doctor` | Repository root | Per-check pass/fail status and actionable repair guidance |
 | `compile` | Locked central/business sources and local rules | Immutable bundle plus stable hash, or diagnostics without replacing the last good bundle |
-| `check` | Repository root and Git diff | Deterministic findings/blocking status, semantic-trigger status, baseline handling, and SARIF-capable locations |
+| `check` | Repository root and Git diff; CI mode uses `--ci --sarif <path> --json <path>` | Deterministic findings/blocking status, semantic-trigger status, baseline handling, SARIF-capable locations, and CheckReport JSON |
 | `replay` | Repository history window and bundle version | Per-rule historical rates and candidate false-positive samples; no gate or history mutation |
 | `mcp` | Local bundle and standard input/output | Starts local MCP service without a central-service dependency |
 

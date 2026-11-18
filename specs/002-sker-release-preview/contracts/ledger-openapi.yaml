@@ -11,6 +11,32 @@ servers:
 security:
   - bearerAuth: []
 paths:
+  /healthz:
+    get:
+      operationId: getHealth
+      summary: Internal application and database readiness probe
+      description: Used by container orchestration. Returns healthy only when the application can reach its configured PostgreSQL 16+ database. This endpoint exposes no event or rule data.
+      security: []
+      responses:
+        '200':
+          description: Application is ready and database connectivity is confirmed.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [status, database]
+                properties:
+                  status:
+                    const: ready
+                  database:
+                    const: connected
+        '503':
+          description: Application is not ready or PostgreSQL is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /api/v1/events:
     post:
       operationId: ingestEvents
