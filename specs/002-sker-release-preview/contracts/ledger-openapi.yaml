@@ -1,0 +1,397 @@
+openapi: 3.1.0
+info:
+  title: Sker Governance Ledger API
+  version: 1.0.0
+  description: Optional asynchronous endpoint for sanitized Sker governance events and read-only aggregate health metrics. Core consult, check, and CI do not depend on this service.
+servers:
+  - url: https://{ledger-host}
+    variables:
+      ledger-host:
+        default: ledger.example.invalid
+security:
+  - bearerAuth: []
+paths:
+  /api/v1/events:
+    post:
+      operationId: ingestEvents
+      summary: Ingest sanitized governance events
+      description: Accepts events asynchronously. event_id is idempotent; duplicates are acknowledged without being counted twice. Request bodies must not contain source code, prompts, secrets, or personal identity.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventBatch'
+      responses:
+        '202':
+          description: Events accepted or already ingested.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventBatchReceipt'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '413':
+          description: Request exceeds the configured batch/body limit.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '422':
+          description: Event schema or privacy validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/metrics/overview:
+    get:
+      operationId: getMetricsOverview
+      summary: Read aggregate metrics overview
+      parameters:
+        - name: window
+          in: query
+          required: false
+          description: Reporting window. Custom windows use both from and to.
+          schema:
+            type: string
+            enum: [7d, 30d, 90d, custom]
+            default: 30d
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Metrics with explicit window, numerator, denominator, sample count, and freshness.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricsOverview'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/rules/health:
+    get:
+      operationId: getRulesHealth
+      summary: Read rule health and lifecycle notices
+      parameters:
+        - name: window
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [7d, 30d, 90d]
+            default: 7d
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/HealthStatus'
+          style: form
+          explode: true
+      responses:
+        '200':
+          description: Rule health notices; notices never mutate or deactivate rules.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuleHealthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque deployment token
+  responses:
+    BadRequest:
+      description: Invalid request or query parameters.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    Unauthorized:
+      description: Missing or invalid deployment credential.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    RateLimited:
+      description: Client is sending events above the configured rate.
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    Unavailable:
+      description: Ledger is unavailable; callers must not block local work or CI decisions.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+  schemas:
+    EventBatch:
+      type: object
+      additionalProperties: false
+      required: [schema_version, events]
+      properties:
+        schema_version:
+          const: sker.ledger-events/v1
+        events:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/GovernanceEvent'
+    GovernanceEvent:
+      type: object
+      additionalProperties: false
+      required: [event_id, occurred_at, event_type, bundle_sha256]
+      properties:
+        event_id:
+          type: string
+          format: uuid
+        occurred_at:
+          type: string
+          format: date-time
+        event_type:
+          type: string
+          enum: [consult, search, check, attest, proposal, ci_gate, replay]
+        rule_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        bundle_sha256:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+        track:
+          type: string
+          enum: [deterministic, semantic]
+        state:
+          type: string
+          enum: [comply, not_triggered_in_logic, exempt, escalate]
+        counters:
+          type: object
+          additionalProperties: false
+          properties:
+            consult_count:
+              type: integer
+              minimum: 0
+            match_count:
+              type: integer
+              minimum: 0
+            changed_line_count:
+              type: integer
+              minimum: 0
+            duration_ms:
+              type: number
+              minimum: 0
+        labels:
+          type: object
+          description: Allowlisted non-identifying dimensions only; arbitrary user strings are not accepted.
+          additionalProperties: false
+          properties:
+            repository_class:
+              type: string
+              enum: [service, library, infra, monorepo, unknown]
+            language:
+              type: string
+              enum: [go, python, typescript, yaml, infra, mixed, unknown]
+            outcome:
+              type: string
+              enum: [pass, block, warn, no_data]
+    EventBatchReceipt:
+      type: object
+      additionalProperties: false
+      required: [status, accepted_event_ids, duplicate_event_ids]
+      properties:
+        status:
+          const: accepted
+        accepted_event_ids:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
+        duplicate_event_ids:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
+    MetricsOverview:
+      type: object
+      additionalProperties: false
+      required: [window, generated_at, metrics]
+      properties:
+        window:
+          $ref: '#/components/schemas/MetricWindow'
+        generated_at:
+          type: string
+          format: date-time
+        metrics:
+          type: array
+          minItems: 7
+          maxItems: 7
+          items:
+            $ref: '#/components/schemas/MetricValue'
+    MetricWindow:
+      type: object
+      additionalProperties: false
+      required: [from, to, label]
+      properties:
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+        label:
+          type: string
+    MetricValue:
+      type: object
+      additionalProperties: false
+      required: [key, value, numerator, denominator, sample_count, freshness]
+      properties:
+        key:
+          type: string
+          enum: [consult_citation_rate, warning_precision, local_coverage, merge_escape_rate, rework_cost_ratio, declaration_mismatch_rate, rule_age_distribution]
+        value:
+          type: [number, 'null']
+          description: Scalar value for scalar metrics; null means no data (including a zero denominator) or a distribution metric represented by distribution. Never encode no data as zero.
+        numerator:
+          type: number
+          minimum: 0
+        denominator:
+          type: number
+          minimum: 0
+        sample_count:
+          type: integer
+          minimum: 0
+        unit:
+          type: string
+          enum: [ratio, percent, count, days, distribution]
+        freshness:
+          type: string
+          enum: [fresh, delayed, stale, unavailable]
+        distribution:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [bucket, rule_count]
+            properties:
+              bucket:
+                type: string
+                enum: [0_30_days, 31_90_days, 91_180_days, over_180_days, unknown]
+              rule_count:
+                type: integer
+                minimum: 0
+      allOf:
+        - if:
+            properties:
+              key:
+                const: rule_age_distribution
+            required: [key]
+          then:
+            required: [distribution]
+            properties:
+              unit:
+                const: distribution
+              value:
+                type: 'null'
+        - if:
+            properties:
+              key:
+                const: rule_age_distribution
+            required: [key]
+          else:
+            properties:
+              distribution:
+                maxItems: 0
+    HealthStatus:
+      type: string
+      enum: [suspected_dead, noisy, lifecycle_expiring, lifecycle_expired]
+      description: suspected_dead means no rule hit for 180 days; noisy means weekly SNR exceeds 70%; lifecycle states follow the rule's ordinary cooldown or hotfix expiry.
+    RuleHealthResponse:
+      type: object
+      additionalProperties: false
+      required: [window, generated_at, notices]
+      properties:
+        window:
+          $ref: '#/components/schemas/MetricWindow'
+        generated_at:
+          type: string
+          format: date-time
+        notices:
+          type: array
+          items:
+            $ref: '#/components/schemas/RuleHealthNotice'
+    RuleHealthNotice:
+      type: object
+      additionalProperties: false
+      required: [rule_id, status, sample_count, first_detected_at, message]
+      properties:
+        rule_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        status:
+          $ref: '#/components/schemas/HealthStatus'
+        sample_count:
+          type: integer
+          minimum: 0
+        noise_rate:
+          type: [number, 'null']
+          minimum: 0
+          maximum: 1
+        last_hit_at:
+          type: [string, 'null']
+          format: date-time
+        expires_at:
+          type: [string, 'null']
+          format: date-time
+        first_detected_at:
+          type: string
+          format: date-time
+        message:
+          type: string
+          minLength: 1
+        action:
+          type: string
+          enum: [review, renew, none]
+          default: review
+    ApiError:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string

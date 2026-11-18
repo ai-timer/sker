@@ -20,7 +20,7 @@ license = "Apache-2.0"
 ast-grep-core = "0.51.3"
 ast-grep-language = "0.51.3"
 ast-grep-config = "0.51.3"
-rmcp = { version = "3.10.0", features = ["server", "macros", "transport-io"] }
+rmcp = { version = "3.10.0", features = ["server", "macros", "transport-io", "schemars"] }
 gix = { version = "0.90.0", default-features = false, features = [
   "sha1",
   "revision",
