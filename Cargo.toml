@@ -25,6 +25,11 @@ gix = { version = "0.90.0", default-features = false, features = [
   "sha1",
   "revision",
   "status",
+  "gix-status",
+  "blob-diff",
+  "index",
+  "dirwalk",
+  "worktree-mutation",
 ] }
 tantivy = "0.27.0"
 blake3 = "1.8"
@@ -43,6 +48,7 @@ globset = "0.4"
 axum = "0.8"
 sqlx = { version = "0.8", features = [
   "runtime-tokio",
+  "tls-rustls-ring",
   "postgres",
   "json",
   "chrono",
