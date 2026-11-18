@@ -1,0 +1,5 @@
+schema_version: sker.playbook/v1
+playbook_id: compiler-regression
+rules:
+  - rules/go-no-logging.yaml
+  - rules/cross-service-notification.yaml
