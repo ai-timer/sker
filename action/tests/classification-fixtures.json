@@ -1,0 +1,18 @@
+{
+  "schema_version": "sker.action-fixtures/v1",
+  "check_matrix": [
+    {"exit_code": 0, "actor": "agent", "expected_block": false},
+    {"exit_code": 1, "actor": "agent", "expected_block": true},
+    {"exit_code": 2, "actor": "agent", "expected_block": true},
+    {"exit_code": 0, "actor": "human", "expected_block": false},
+    {"exit_code": 1, "actor": "human", "expected_block": true},
+    {"exit_code": 2, "actor": "human", "expected_block": false}
+  ],
+  "classification": [
+    {"name": "protected label", "labels": ["agent-authored"], "declaration": "agent", "expected_actor": "agent"},
+    {"name": "pure human", "labels": [], "declaration": "human-only", "expected_actor": "human"},
+    {"name": "agent evidence overrides human declaration", "labels": ["agent-authored"], "declaration": "human-only", "expected_actor": "agent"},
+    {"name": "credential is agent evidence", "credential_present": true, "declaration": "human-only", "expected_actor": "agent"}
+  ],
+  "edge_cases": ["stale credential", "tampered credential digest", "missing semantic declaration", "malformed CheckReport", "SARIF upload absent", "Ledger unavailable"]
+}
