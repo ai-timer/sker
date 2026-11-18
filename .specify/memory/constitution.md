@@ -1,50 +1,79 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+Sync Impact Report
+- Version change: unratified template → 1.0.0 (initial adoption)
+- Modified principles: template placeholders → Sker Release Preview principles I–V
+- Added sections: Rust Constraints; Quality Gates
+- Removed sections: none
+- Follow-up TODOs: confirm the original ratification date
+-->
+
+# Sker Release Preview Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Git Is the Sole Source of Truth
+Git is the only source of truth for project state and policy. A change becomes effective
+only after approval by two human reviewers on its pull request. Agents MUST only propose
+candidate pull requests; they MUST NOT approve or make changes effective. This keeps
+authority auditable and with human maintainers.
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### II. Offline-First Operation
+The `consult`, `check`, and CI workflows MUST run to completion without depending on a
+remote central service. Remote integrations MAY add convenience, but MUST NOT be required
+for these workflows. This keeps core review and validation available in disconnected and
+self-hosted environments.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### III. Deterministic and Semantic Checks Are Separate
+The system MUST distinguish `deterministic` checks, whose results can be computed
+reproducibly, from `semantic` judgments that cannot be decided reliably by static rules.
+It MUST NOT present an undecidable or semantic question as statically decidable. Reports
+and outcomes MUST identify which track produced them, so users can understand the limits
+of each result.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### IV. Context Cost Is Independent of Rule Count
+The context cost of `consult`, `check`, and CI MUST be decoupled from the number of rules
+(`n`). Adding rules MUST NOT require loading every rule into every operation's context;
+the implementation MUST select or retrieve only the context needed for the current task.
+This keeps review cost predictable as the rule set grows.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### V. Crates Communicate Through Shared Schema
+All workspace Crates MUST exchange data through types defined by `sker-schema`. Crates
+MUST NOT establish ad hoc cross-Crate data contracts. Changes to shared structures MUST
+be represented in `sker-schema`, making boundaries explicit and compatible across the
+workspace.
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+## Rust Constraints
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+The workspace MUST NOT introduce dependencies that require C-linked libraries such as
+OpenSSL or libgit2. Use `gix` for Git operations, `rustls` for TLS, and `ast-grep-core`
+for syntax-aware code analysis. Any exception requires amending this Constitution before
+the dependency is introduced.
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+## Quality Gates
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+Every Crate MUST have unit tests and boundary tests. Every static rule MUST be validated
+with positive and negative fixtures. Before a change is merged, both of the following
+commands MUST pass:
+
+```sh
+cargo test --workspace && cargo clippy --workspace -- -D warnings
+```
+
+Pull request review MUST verify compliance with these gates and the Core Principles.
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This Constitution is the authoritative governance document for Sker Release Preview.
+Amendments MUST be made in Git and require approval from two human reviewers; an agent
+may prepare a candidate amendment but cannot approve or enact it. Reviewers MUST assess
+the effect of an amendment on existing crates, rules, fixtures, workflows, and dependent
+project guidance before approval.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+The version follows Semantic Versioning: increment MAJOR for incompatible governance
+changes or removals, MINOR for new principles or materially expanded requirements, and
+PATCH for clarifications and non-semantic edits. Every amendment MUST update the version
+and last-amended date. Compliance MUST be reviewed during pull request review, and
+violations MUST be corrected before merge or addressed by an approved Constitution
+amendment.
+
+**Version**: 1.0.0 | **Ratified**: TODO(RATIFICATION_DATE): confirm original adoption date | **Last Amended**: 2026-11-17
