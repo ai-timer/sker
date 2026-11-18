@@ -4,7 +4,7 @@ This document defines provider-neutral observable contracts. Shared Rust structu
 
 Frozen contract files:
 
-- [crate-traits.rs](crate-traits.rs): cross-crate trait signatures and shared error enum declarations.
+- [crate-traits.rs](crate-traits.rs): cross-crate trait signatures referencing the shared error enums defined and re-exported by `sker-schema`.
 - [cli-ci.json](cli-ci.json): frozen CI invocation, exit-code semantics, atomic output rule, and CheckReport JSON Schema.
 - [entry-schema.json](entry-schema.json): complete v1 Entry schema for YAML rule entries.
 - [mcp-tools.json](mcp-tools.json): `sker_consult`, `sker_search`, `sker_attest`, and `sker_propose` input/output schemas. Its `sker_propose.entry` reference resolves to the co-shipped `entry-schema.json`; implementations use this bundled schema and do not fetch it over the network.

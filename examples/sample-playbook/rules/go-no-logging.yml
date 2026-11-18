@@ -1,0 +1,6 @@
+id: go.no-fmt-printf
+language: Go
+rule:
+  pattern: fmt.Printf($FMT, $$$ARGS)
+message: Use a structured logger instead of fmt.Printf in service code.
+severity: error

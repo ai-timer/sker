@@ -1,0 +1,6 @@
+change: billing service local formatting cleanup
+producer_service: billing
+producer_languages: [go]
+publication: null
+consumer: null
+signal_expected: false

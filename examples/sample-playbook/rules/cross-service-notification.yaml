@@ -1,0 +1,32 @@
+schema_version: sker.entry/v1
+rule_id: architecture.cross-service-notification
+version: 1.0.0
+title: Preserve notification delivery across service boundaries
+domain: architecture.service-boundaries
+description: When a service change creates or updates an event consumed by another service, assess durable publication, delivery, and idempotent handling.
+rationale: Cross-service state changes can silently lose downstream notifications when delivery is coupled to an in-process operation.
+severity: WARN
+track: semantic
+scope:
+  include_paths:
+    - "services/**/*"
+    - "deploy/**/*"
+signals:
+  - signal_id: producer-publishes-event
+    languages: [go, python, typescript, yaml]
+    description: A producer or deployment configuration declares a cross-service event publication.
+    pattern: "publish(event) | outbox | event:"
+  - signal_id: notification-consumer
+    languages: [go, python, typescript, yaml]
+    description: A notification service subscribes to a producer-owned event.
+    pattern: "subscribe(event) | consumer: notifications"
+exemptions: []
+overrides: []
+fixtures: []
+lifecycle:
+  kind: ordinary
+  cooldown_hours: 24
+consult:
+  synonyms: [event delivery, outbox, notification fanout, idempotent consumer]
+  keywords: [cross-service, notification, reliability]
+tags: [semantic, architecture, multi-language]

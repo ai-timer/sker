@@ -11,5 +11,6 @@ serde_yaml_ng.workspace = true
 blake3.workspace = true
 rkyv.workspace = true
 schemars.workspace = true
+sha2.workspace = true
 thiserror.workspace = true
 anyhow.workspace = true

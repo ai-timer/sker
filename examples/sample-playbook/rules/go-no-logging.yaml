@@ -1,0 +1,38 @@
+schema_version: sker.entry/v1
+rule_id: go.no-fmt-printf
+version: 1.0.0
+title: Use structured logging in Go services
+domain: observability.logging
+description: Do not use fmt.Printf for service logs; use the structured logger so fields remain queryable.
+rationale: Formatted stdout logging drops severity and structured context.
+severity: BLOCK
+track: deterministic
+scope:
+  include_paths:
+    - "services/**/*.go"
+signals:
+  - signal_id: fmt-printf-call
+    languages: [go]
+    description: A fmt.Printf call in changed Go code.
+    pattern: "fmt.Printf($FMT, $$$ARGS)"
+exemptions: []
+overrides: []
+fixtures:
+  - fixture_id: printf-call
+    polarity: positive
+    path: examples/sample-playbook/fixtures/go-no-logging/positive/no_logging.go
+    expected: trigger
+  - fixture_id: structured-logger
+    polarity: negative
+    path: examples/sample-playbook/fixtures/go-no-logging/negative/allowed_logging.go
+    expected: no_trigger
+compliant_alternatives:
+  - "logger.Info(\"request completed\", \"request_id\", requestID)"
+  - "logger.Error(\"request failed\", \"error\", err)"
+lifecycle:
+  kind: ordinary
+  cooldown_hours: 24
+consult:
+  synonyms: [structured log, key-value log, slog]
+  keywords: [observability, logging]
+tags: [go, deterministic]

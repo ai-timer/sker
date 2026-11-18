@@ -1,0 +1,6 @@
+schema_version: sker.playbook/v1
+playbook_id: sker-preview-samples
+description: First deterministic and semantic examples for the Sker Preview contract.
+rules:
+  - rules/go-no-logging.yaml
+  - rules/cross-service-notification.yaml
