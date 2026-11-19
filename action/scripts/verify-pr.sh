@@ -60,6 +60,9 @@ NODE
 const fs = require('node:fs');
 const c = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 delete c.credential_blake3;
+for (const v of c.semantic_verdicts || []) {
+  if (v && v.rationale_digest === null) delete v.rationale_digest;
+}
 function canon(v) {
   if (Array.isArray(v)) return `[${v.map(canon).join(',')}]`;
   if (v && typeof v === 'object') return `{${Object.keys(v).sort().map(k => `${JSON.stringify(k)}:${canon(v[k])}`).join(',')}}`;

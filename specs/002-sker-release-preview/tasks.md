@@ -76,11 +76,11 @@
 
 ### Lane E — CLI `[US5]` (write lock: `crates/sker-cli/**`)
 
-- [ ] T038 [P] [US5] Implement Clap command tree and wiring for compile/check/consult/search/attest/propose/replay/init/doctor/baseline in `crates/sker-cli/src/main.rs` and `crates/sker-cli/src/commands/mod.rs`; acceptance: `cargo test -p sker-cli`
-- [ ] T039 [US5] Implement idempotent language/host detection and managed configuration initialization in `crates/sker-cli/src/commands/init.rs`; acceptance: `cargo test -p sker-cli`
-- [ ] T040 [US5] Implement rule-bundle hash, managed-block size, Hook, MCP, and platform checks with actionable results in `crates/sker-cli/src/commands/doctor.rs`; acceptance: `cargo test -p sker-cli`
-- [ ] T041 [US5] Implement baseline create/update/list operations and auditable stable-anchor serialization in `crates/sker-cli/src/commands/baseline.rs`; acceptance: `cargo test -p sker-cli`
-- [ ] T042 [US5] Add CLI command and clean-repository integration tests in `crates/sker-cli/tests/commands.rs`; acceptance: `cargo test -p sker-cli`
+- [x] T038 [P] [US5] Implement Clap command tree and wiring for compile/check/consult/search/attest/propose/replay/init/doctor/baseline in `crates/sker-cli/src/main.rs` and `crates/sker-cli/src/commands/mod.rs`; acceptance: `cargo test -p sker-cli`
+- [x] T039 [US5] Implement idempotent language/host detection and managed configuration initialization in `crates/sker-cli/src/commands/init.rs`; acceptance: `cargo test -p sker-cli`
+- [x] T040 [US5] Implement rule-bundle hash, managed-block size, Hook, MCP, and platform checks with actionable results in `crates/sker-cli/src/commands/doctor.rs`; acceptance: `cargo test -p sker-cli`
+- [x] T041 [US5] Implement baseline create/update/list operations and auditable stable-anchor serialization in `crates/sker-cli/src/commands/baseline.rs`; acceptance: `cargo test -p sker-cli`
+- [x] T042 [US5] Add CLI command and clean-repository integration tests in `crates/sker-cli/tests/commands.rs`; acceptance: `cargo test -p sker-cli`
 
 ### Lane F — GitHub Action `[US4]` (write lock: `action/**`)
 

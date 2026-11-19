@@ -28,3 +28,25 @@ pub fn compile(request: &CompileRequest) -> Result<RuleBundle, CompileError> {
     bundle.validate()?;
     Ok(bundle)
 }
+
+pub fn compile_repository_rules(
+    rules: Vec<sker_schema::RuleEntry>,
+    compiler_version: String,
+) -> Result<RuleBundle, CompileError> {
+    crate::fixtures::validate_fixtures(&rules)?;
+    let content_hash = sker_schema::compute_bundle_sha256(&[], &rules)?;
+    let lock = sker_schema::SourceLock {
+        kind: sker_schema::RuleSourceKind::RepositoryLocal,
+        source_id: "repository".into(),
+        version: "working-tree".into(),
+        content_hash,
+    };
+    let request = CompileRequest {
+        sources: vec![sker_schema::RuleSource {
+            lock,
+            rules,
+        }],
+        compiler_version,
+    };
+    compile(&request)
+}

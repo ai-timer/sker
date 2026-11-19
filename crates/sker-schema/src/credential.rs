@@ -48,6 +48,7 @@ pub struct SemanticVerdict {
     pub rule_id: String,
     pub state: SemanticVerdictState,
     pub declaration: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rationale_digest: Option<String>,
 }
 
@@ -130,6 +131,17 @@ pub fn credential_blake3(credential: &AgentCredential) -> Result<String, serde_j
     let mut payload = serde_json::to_value(credential)?;
     if let Value::Object(ref mut fields) = payload {
         fields.remove("credential_blake3");
+        if let Some(Value::Array(verdicts)) = fields.get_mut("semantic_verdicts") {
+            for verdict in verdicts {
+                if let Value::Object(fields) = verdict
+                    && fields
+                        .get("rationale_digest")
+                        .is_some_and(Value::is_null)
+                {
+                    fields.remove("rationale_digest");
+                }
+            }
+        }
     }
     let bytes = canonical_json_bytes(&payload)?;
     Ok(blake3::hash(&bytes).to_hex().to_string())

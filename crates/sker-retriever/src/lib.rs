@@ -1,6 +1,7 @@
 //! Offline BM25 retrieval over an immutable rule bundle.
 use globset::{Glob, GlobSet, GlobSetBuilder};
-use sker_schema::{ConsultQuery, ConsultResponse, ConsultResultStatus, RetrievalError, RuleBundle, RuleEntry, RuleMatch, SearchQuery, SearchResponse, SearchStatus, IntentRetriever, compute_bundle_sha256};
+pub use sker_schema::IntentRetriever;
+use sker_schema::{ConsultQuery, ConsultResponse, ConsultResultStatus, RetrievalError, RuleBundle, RuleEntry, RuleMatch, SearchQuery, SearchResponse, SearchStatus, compute_bundle_sha256};
 use tantivy::{Index, TantivyDocument, doc, schema::{Schema, STORED, TEXT, Value as TantivyValue}, query::QueryParser, collector::TopDocs};
 
 pub struct TantivyRetriever { minimum_score: f64 }

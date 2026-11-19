@@ -1,15 +1,15 @@
-use super::{atomic_json, create_bundle};
+use super::{atomic_json, find_repo};
 use anyhow::Result;
-use std::{fs, path::Path};
+use std::path::Path;
+
 pub fn run(path: &Path) -> Result<()> {
-    let repo = super::find_repo(path)?;
-    let b = create_bundle(&repo)?;
-    fs::create_dir_all(repo.join(".sker"))?;
+    let repo = find_repo(path)?;
+    let rules = super::support::load_rules(&repo)?;
+    let b = sker_compiler::compile_repository_rules(rules, env!("CARGO_PKG_VERSION").into())?;
+    std::fs::create_dir_all(repo.join(".sker"))?;
     atomic_json(&repo.join(".sker/bundle.json"), &b)?;
-    let bytes = sker_schema::archive_bundle(&b)?;
-    let tmp = repo.join(".sker/bundle.rkyv.tmp");
-    fs::write(&tmp, &bytes)?;
-    fs::rename(tmp, repo.join(".sker/bundle.rkyv"))?;
+    sker_compiler::publish_bundle(&b, repo.join(".sker/bundle.rkyv"))?;
+    let _ = sker_compiler::write_projections(&b, &repo);
     println!(
         "compiled {} rules; sha256 {}",
         b.rules.len(),

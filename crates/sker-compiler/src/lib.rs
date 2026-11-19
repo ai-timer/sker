@@ -6,7 +6,7 @@ mod projections;
 mod publish;
 mod sources;
 
-pub use bundle::{Compiler, compile};
+pub use bundle::{Compiler, compile, compile_repository_rules};
 pub use fixtures::validate_fixtures;
 pub use projections::{Projection, project_guidance, write_projections};
 pub use publish::{publish_bundle, write_bundle_archive};

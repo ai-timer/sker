@@ -93,9 +93,10 @@ enum BaselineCommand {
     Update,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let cli = Cli::parse();
-    if let Err(error) = commands::run(cli.command) {
+    if let Err(error) = commands::run(cli.command).await {
         eprintln!("sker: {error:#}");
         std::process::exit(2);
     }

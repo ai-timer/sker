@@ -71,6 +71,20 @@ pub fn run(
         );
         println!("{}", serde_json::to_string_pretty(&report)?);
     }
+    let outcome = if report.status == CheckStatus::Blocked {
+        "block"
+    } else if report.status == CheckStatus::Passed {
+        "pass"
+    } else {
+        "no_data"
+    };
+    super::telemetry::report_event_async(
+        &repo,
+        if ci { "ci_gate" } else { "check" },
+        &report.bundle_sha256,
+        report.changed_line_count,
+        outcome,
+    );
     if ci && !report.analysis.complete {
         std::process::exit(2)
     }

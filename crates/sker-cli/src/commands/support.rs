@@ -1,8 +1,5 @@
 use anyhow::{Context, Result, bail};
-use sker_schema::{
-    BundleMetadata, RuleBundle, RuleEntry, RuleSource, RuleSourceKind, SourceLock,
-    compute_bundle_sha256,
-};
+use sker_schema::{RuleBundle, RuleEntry};
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -118,33 +115,4 @@ pub fn load_baseline(repo: &Path) -> Result<Vec<sker_schema::BaselineItem>> {
         return Ok(Vec::new());
     }
     Ok(serde_json::from_slice(&fs::read(p)?)?)
-}
-pub fn create_bundle(repo: &Path) -> Result<RuleBundle> {
-    let rules = load_rules(repo)?;
-    let content_hash = compute_bundle_sha256(&[], &rules)?;
-    let lock = SourceLock {
-        kind: RuleSourceKind::RepositoryLocal,
-        source_id: "repository".into(),
-        version: "working-tree".into(),
-        content_hash,
-    };
-    let sources = vec![lock.clone()];
-    let sha = compute_bundle_sha256(&sources, &rules)?;
-    let b = RuleBundle {
-        schema_version: "sker.bundle/v1".into(),
-        bundle_id: sha.clone(),
-        bundle_sha256: sha,
-        sources,
-        rules,
-        metadata: BundleMetadata {
-            created_at: now(),
-            compiler_version: env!("CARGO_PKG_VERSION").into(),
-        },
-    };
-    b.validate()?;
-    let _ = RuleSource {
-        lock,
-        rules: vec![],
-    };
-    Ok(b)
 }

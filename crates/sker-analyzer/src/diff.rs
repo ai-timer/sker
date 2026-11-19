@@ -3,7 +3,9 @@ use sker_schema::{AnalysisError, DiffEntry, DiffStatus};
 /// Extract a deterministic tree-to-tree diff using gix's repository/object APIs.
 pub fn extract_diff(root: &str, base: &str, head: &str) -> Result<Vec<DiffEntry>, AnalysisError> {
     use gix::bstr::ByteSlice;
-    let repo = gix::discover(root).map_err(|e| AnalysisError::RepositoryUnavailable { detail: e.to_string() })?;
+    let repo = gix::open_opts(root, gix::open::Options::isolated())
+        .or_else(|_| gix::discover(root))
+        .map_err(|e| AnalysisError::RepositoryUnavailable { detail: e.to_string() })?;
     let resolve = |rev: &str| repo.rev_parse_single(rev).map_err(|e| AnalysisError::DiffUnavailable { detail: e.to_string() });
     let old = repo.find_commit(resolve(base)?).and_then(|c| c.tree()).map_err(|e| AnalysisError::DiffUnavailable { detail: e.to_string() })?;
     let new = repo.find_commit(resolve(head)?).and_then(|c| c.tree()).map_err(|e| AnalysisError::DiffUnavailable { detail: e.to_string() })?;
@@ -13,9 +15,24 @@ pub fn extract_diff(root: &str, base: &str, head: &str) -> Result<Vec<DiffEntry>
     platform.for_each_to_obtain_tree(&new, |change| {
         use gix::object::tree::diff::Change;
         let (path, status, old_mode, new_mode, old_id, new_id) = match change {
-            Change::Addition { location, entry_mode, id, .. } => (location.to_str_lossy().into_owned(), DiffStatus::Added, None, Some(entry_mode.value() as u32), None, Some(id)),
-            Change::Deletion { location, entry_mode, id, .. } => (location.to_str_lossy().into_owned(), DiffStatus::Deleted, Some(entry_mode.value() as u32), None, Some(id), None),
-            Change::Modification { location, previous_entry_mode, previous_id, entry_mode, id, .. } => (location.to_str_lossy().into_owned(), DiffStatus::Modified, Some(previous_entry_mode.value() as u32), Some(entry_mode.value() as u32), Some(previous_id), Some(id)),
+            Change::Addition { location, entry_mode, id, .. } => {
+                if entry_mode.is_tree() {
+                    return Ok(std::ops::ControlFlow::Continue(()));
+                }
+                (location.to_str_lossy().into_owned(), DiffStatus::Added, None, Some(entry_mode.value() as u32), None, Some(id))
+            }
+            Change::Deletion { location, entry_mode, id, .. } => {
+                if entry_mode.is_tree() {
+                    return Ok(std::ops::ControlFlow::Continue(()));
+                }
+                (location.to_str_lossy().into_owned(), DiffStatus::Deleted, Some(entry_mode.value() as u32), None, Some(id), None)
+            }
+            Change::Modification { location, previous_entry_mode, previous_id, entry_mode, id, .. } => {
+                if entry_mode.is_tree() || previous_entry_mode.is_tree() {
+                    return Ok(std::ops::ControlFlow::Continue(()));
+                }
+                (location.to_str_lossy().into_owned(), DiffStatus::Modified, Some(previous_entry_mode.value() as u32), Some(entry_mode.value() as u32), Some(previous_id), Some(id))
+            }
             Change::Rewrite { .. } => return Ok(std::ops::ControlFlow::Continue(())),
         };
         let old_blob = old_id.and_then(|id| id.object().ok()).map(|o| o.data.clone()).unwrap_or_default();

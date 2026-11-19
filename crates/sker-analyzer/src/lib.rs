@@ -28,6 +28,7 @@ pub use diff::extract_diff;
 pub use replay::{replay, ReplayCommit};
 pub use sarif::{sarif_document, SARIF_VERSION};
 pub use credential_verify::verify_credential;
+pub use rules::generate_baseline;
 
 #[cfg(test)]
 mod tests {
@@ -78,7 +79,7 @@ mod tests {
         use std::{fs,process::Command,time::{SystemTime,UNIX_EPOCH}};
         let root=std::env::temp_dir().join(format!("sker-analyzer-{}",SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()));fs::create_dir_all(&root).unwrap();
         let git=|args:&[&str]|{let status=Command::new("git").args(args).current_dir(&root).status().unwrap();assert!(status.success());};
-        git(&["init","-q"]);git(&["config","user.email","test@example.invalid"]);git(&["config","user.name","Analyzer Test"]);
+        git(&["init","-q"]);git(&["config","user.email","test@example.invalid"]);git(&["config","user.name","Analyzer Test"]);git(&["config","core.attributesfile",""]);
         fs::write(root.join("sample.go"),"package sample\nfunc old() {}\n").unwrap();git(&["add","sample.go"]);git(&["commit","-qm","base"]);let base=String::from_utf8(Command::new("git").args(["rev-parse","HEAD"]).current_dir(&root).output().unwrap().stdout).unwrap().trim().to_owned();
         fs::write(root.join("sample.go"),"package sample\nfunc changed() {}\nfunc added() {}\n").unwrap();git(&["add","sample.go"]);git(&["commit","-qm","head"]);let head=String::from_utf8(Command::new("git").args(["rev-parse","HEAD"]).current_dir(&root).output().unwrap().stdout).unwrap().trim().to_owned();
         let diff=extract_diff(root.to_str().unwrap(),&base,&head).unwrap();assert_eq!(diff.len(),1);assert_eq!(diff[0].path,"sample.go");assert!(!diff[0].added_lines.is_empty());let _=fs::remove_dir_all(root);

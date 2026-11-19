@@ -5,11 +5,12 @@ mod doctor;
 mod init;
 mod interaction;
 mod support;
+pub mod telemetry;
 
 use crate::Command;
 use anyhow::Result;
 
-pub fn run(command: Command) -> Result<()> {
+pub async fn run(command: Command) -> Result<()> {
     match command {
         Command::Compile { repo } => compile::run(&repo),
         Command::Check {
@@ -47,9 +48,9 @@ pub fn run(command: Command) -> Result<()> {
         Command::Init { repo } => init::run(&repo),
         Command::Doctor { repo } => doctor::run(&repo),
         Command::Baseline { operation, repo } => baseline::run(&repo, operation),
-        Command::Mcp { repo } => interaction::mcp(&repo),
+        Command::Mcp { repo } => interaction::mcp(&repo).await,
         Command::Hook { repo, hard_block } => interaction::hook(&repo, hard_block),
     }
 }
 
-pub use support::{atomic_json, bundle, create_bundle, find_repo, load_baseline, now};
+pub use support::{atomic_json, bundle, find_repo, load_baseline, now};

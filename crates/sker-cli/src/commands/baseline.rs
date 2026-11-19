@@ -1,7 +1,7 @@
 use super::{atomic_json, bundle, find_repo, load_baseline, now};
 use crate::BaselineCommand;
 use anyhow::{Context, Result};
-use sker_schema::{AnalysisRequest, DiffAnalyzer, DiffEntry, DiffStatus};
+use sker_schema::{AnalysisRequest, DiffEntry, DiffStatus};
 use std::{fs, path::Path, process::Command};
 pub fn run(path: &Path, op: BaselineCommand) -> Result<()> {
     let repo = find_repo(path)?;
@@ -43,24 +43,11 @@ pub fn run(path: &Path, op: BaselineCommand) -> Result<()> {
                 baseline: items.clone(),
                 now: now(),
             };
-            let report = sker_analyzer::Analyzer.analyze(&b, &req)?;
+            let new_items = sker_analyzer::generate_baseline(&b, &req)?;
             if matches!(op, BaselineCommand::Freeze) {
-                items.clear()
+                items.clear();
             }
-            for f in report.findings {
-                if f.track == sker_schema::RuleTrack::Deterministic {
-                    items.push(sker_schema::BaselineItem {
-                        repository_path: f.path,
-                        rule_id: f.rule_id,
-                        syntax_anchor: None,
-                        symbol: None,
-                        normalized_fragment: f.message,
-                        line_hint: Some(f.start_line),
-                        exception: None,
-                        audit: vec![format!("frozen at {}", now())],
-                    });
-                }
-            }
+            items.extend(new_items);
             items.sort_by(|a, b| a.identity().cmp(&b.identity()));
             items.dedup_by(|a, b| a.identity() == b.identity());
             fs::create_dir_all(file.parent().unwrap())?;
