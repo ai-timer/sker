@@ -84,12 +84,12 @@
 
 ### Lane F — GitHub Action `[US4]` (write lock: `action/**`)
 
-- [ ] T043 [P] [US4] Implement Action inputs, permissions, supported runner invocation, and SARIF upload wiring in `action/action.yml`, consuming the frozen `specs/002-sker-release-preview/contracts/cli-ci.json` argv, exit-code, and CheckReport schema contract; acceptance: `action/scripts/test-action.sh`
-- [ ] T044 [US4] Implement PR classification using protected Agent marker or a credential bound to the current diff, with Agent evidence overriding a “human-only” declaration, in `action/scripts/classify-pr.sh`; acceptance: `action/scripts/test-action.sh`
-- [ ] T045 [US4] Implement verifier-only CI flow that recomputes PR diff and validates the submitted local credential/declaration set without creating or repairing credentials in `action/scripts/verify-pr.sh`; acceptance: `action/scripts/test-action.sh`
-- [ ] T046 [US4] Implement SARIF 2.1.0 upload and Agent/human PR compliance-card behavior in `action/scripts/report-pr.sh`; acceptance: `action/scripts/test-action.sh`
-- [ ] T047 [US4] Implement sanitized asynchronous fail-open ledger event posting that cannot change gate status or delay completion in `action/scripts/post-ledger-event.sh`; acceptance: `action/scripts/test-action.sh`
-- [ ] T048 [US4] Add Agent evidence, pure-human, stale/tampered credential, CLI exit-code/report-shape, SARIF, card, and ledger-outage contract fixtures in `action/tests/classification-fixtures.json` and the action test runner in `action/scripts/test-action.sh`; Phase 3 tests against the frozen CLI contract without requiring Lane E’s binary; acceptance: `action/scripts/test-action.sh`
+- [x] T043 [P] [US4] Implement Action inputs, permissions, supported runner invocation, and SARIF upload wiring in `action/action.yml`, consuming the frozen `specs/002-sker-release-preview/contracts/cli-ci.json` argv, exit-code, and CheckReport schema contract; acceptance: `action/scripts/test-action.sh`
+- [x] T044 [US4] Implement PR classification using protected Agent marker or a credential bound to the current diff, with Agent evidence overriding a “human-only” declaration, in `action/scripts/classify-pr.sh`; acceptance: `action/scripts/test-action.sh`
+- [x] T045 [US4] Implement verifier-only CI flow that recomputes PR diff and validates the submitted local credential/declaration set without creating or repairing credentials in `action/scripts/verify-pr.sh`; acceptance: `action/scripts/test-action.sh`
+- [x] T046 [US4] Implement SARIF 2.1.0 upload and Agent/human PR compliance-card behavior in `action/scripts/report-pr.sh`; acceptance: `action/scripts/test-action.sh`
+- [x] T047 [US4] Implement sanitized asynchronous fail-open ledger event posting that cannot change gate status or delay completion in `action/scripts/post-ledger-event.sh`; acceptance: `action/scripts/test-action.sh`
+- [x] T048 [US4] Add Agent evidence, pure-human, stale/tampered credential, CLI exit-code/report-shape, SARIF, card, and ledger-outage contract fixtures in `action/tests/classification-fixtures.json` and the action test runner in `action/scripts/test-action.sh`; Phase 3 tests against the frozen CLI contract without requiring Lane E’s binary; acceptance: `action/scripts/test-action.sh`
 
 **Checkpoint**: CLI flows work locally; Action independently verifies PR state and remains fail-open for asynchronous telemetry.
 
