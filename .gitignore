@@ -5,13 +5,19 @@
 # 注意：本仓库包含可执行二进制 (sker-cli / sker-ledger)，
 # 必须保留 Cargo.lock 进 Git 以保证构建可重现，不要忽略 Cargo.lock。
 
-# === Sker 本地缓存与临时报告（保留 .sker.yaml / .sker.lock / rules / baseline）===
+# === Sker 本地缓存与临时报告（保留 .sker.yaml / .sker.lock / rules / baseline / bundle.json）===
 .sker/cache/
 .sker/tmp/
 .sker/*.rkyv
 .sker/*.sha256
+.sker/check.json
+.sker/report.json
+.sker/report.sarif
+.sker/credential.json
 *.sarif
 sker-report.json
+sker-check-report.json
+sker-results.sarif
 
 # === 环境变量与 Ledger 本地数据库卷 ===
 .env

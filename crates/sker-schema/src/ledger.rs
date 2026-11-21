@@ -13,6 +13,7 @@ pub enum GovernanceEventType {
     Proposal,
     CiGate,
     Replay,
+    Compile,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -68,6 +69,22 @@ pub enum EventOutcome {
     Block,
     Warn,
     NoData,
+    Mismatch,
+    Escalate,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RuleLifecycleSnapshot {
+    pub rule_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<crate::LifecycleKind>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cooldown_hours: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hotfix_expires_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub review_by: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -87,6 +104,8 @@ pub struct GovernanceEvent {
     pub counters: Option<EventCounters>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub labels: Option<EventLabels>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lifecycles: Option<Vec<RuleLifecycleSnapshot>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

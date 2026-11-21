@@ -18,6 +18,40 @@ fn fixture_path(path: &str) -> PathBuf {
             .join(path)
     }
 }
+
+fn resolve_detector_yaml(rule: &RuleEntry, _path: &str) -> Option<String> {
+    if let Some(ref c) = rule.detector_content {
+        return Some(c.clone());
+    }
+    let det_ref = rule
+        .detector
+        .as_deref()
+        .or(rule.ast_rule.as_deref())
+        .or_else(|| {
+            rule.signals
+                .iter()
+                .find_map(|s| s.detector.as_deref().or(s.ast_rule.as_deref()))
+        })?;
+    if det_ref.contains('\n')
+        || (det_ref.contains(':') && !det_ref.ends_with(".yaml") && !det_ref.ends_with(".yml"))
+    {
+        return Some(det_ref.to_string());
+    }
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../");
+    let candidates = [
+        repo_root.join(det_ref),
+        repo_root.join("examples/sample-playbook").join(det_ref),
+    ];
+    for c in candidates {
+        if c.exists()
+            && let Ok(content) = fs::read_to_string(&c)
+        {
+            return Some(content);
+        }
+    }
+    None
+}
+
 fn triggers(rule: &RuleEntry, source: &str, path: &str) -> bool {
     let ext = Path::new(path)
         .extension()
@@ -28,12 +62,32 @@ fn triggers(rule: &RuleEntry, source: &str, path: &str) -> bool {
         "py" => Language::Python,
         "ts" | "tsx" => Language::Typescript,
         "yaml" | "yml" => Language::Yaml,
+        "rs" => Language::Rust,
         _ => Language::Any,
     };
+
+    if let Some(yaml) = resolve_detector_yaml(rule, path)
+        && let Ok(configs) =
+            ast_grep_config::from_yaml_string::<SupportLang>(&yaml, &Default::default())
+    {
+        for config in configs {
+            let lang = config.language;
+            let grep = lang.ast_grep(source);
+            if let Ok(matcher) = config.get_matcher(&Default::default())
+                && grep.root().find(matcher).is_some()
+            {
+                return true;
+            }
+        }
+    }
+
     rule.signals
         .iter()
         .filter(|s| s.languages.contains(&inferred) || s.languages.contains(&Language::Any))
         .any(|signal| {
+            if signal.pattern.is_empty() {
+                return false;
+            }
             signal
                 .languages
                 .iter()
@@ -43,6 +97,7 @@ fn triggers(rule: &RuleEntry, source: &str, path: &str) -> bool {
                         Language::Python => "python",
                         Language::Typescript => "typescript",
                         Language::Yaml | Language::Infra => "yaml",
+                        Language::Rust => "rust",
                         Language::Any => return None,
                     };
                     let lang: SupportLang = alias.parse().ok()?;

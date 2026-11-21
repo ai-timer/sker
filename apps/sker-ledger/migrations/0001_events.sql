@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS governance_events (
   event_id UUID PRIMARY KEY,
   occurred_at TIMESTAMPTZ NOT NULL,
-  event_type TEXT NOT NULL CHECK (event_type IN ('consult','search','check','attest','proposal','ci_gate','replay')),
+  event_type TEXT NOT NULL CHECK (event_type IN ('consult','search','check','attest','proposal','ci_gate','replay','compile')),
   rule_id VARCHAR(128),
   bundle_sha256 CHAR(64) NOT NULL CHECK (bundle_sha256 ~ '^[0-9a-f]{64}$'),
   track TEXT CHECK (track IS NULL OR track IN ('deterministic','semantic')),
@@ -17,7 +17,10 @@ CREATE TABLE IF NOT EXISTS rule_lifecycles (
   activated_at TIMESTAMPTZ,
   cooldown_hours INTEGER CHECK (cooldown_hours IS NULL OR cooldown_hours >= 0),
   hotfix_expires_at TIMESTAMPTZ,
+  review_by TIMESTAMPTZ,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CHECK (hotfix_expires_at IS NULL OR cooldown_hours IS NULL)
 );
+ALTER TABLE rule_lifecycles ADD COLUMN IF NOT EXISTS review_by TIMESTAMPTZ;
 CREATE INDEX IF NOT EXISTS rule_lifecycles_expiry_idx ON rule_lifecycles(hotfix_expires_at) WHERE hotfix_expires_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS rule_lifecycles_review_idx ON rule_lifecycles(review_by) WHERE review_by IS NOT NULL;

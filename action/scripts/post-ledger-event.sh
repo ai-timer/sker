@@ -19,7 +19,8 @@ process.stdout.write(JSON.stringify({schema_version:'sker.ledger-events/v1',even
 NODE
 )"
 headers=(-H 'Content-Type: application/json')
-[[ -z "${INPUT_LEDGER_TOKEN:-}" ]] || headers+=(-H "Authorization: Bearer ${INPUT_LEDGER_TOKEN}")
+token="${INPUT_LEDGER_TOKEN:-${LEDGER_BEARER_TOKEN:-}}"
+[[ -z "$token" ]] || headers+=(-H "Authorization: Bearer $token")
 # Backgrounded with a short timeout; command failure and outage are ignored.
 (curl --silent --show-error --max-time 2 -X POST "$url" "${headers[@]}" --data-binary "$body" >/dev/null 2>&1) >/dev/null 2>&1 &
 exit 0

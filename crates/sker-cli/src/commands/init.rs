@@ -33,6 +33,9 @@ pub fn run(path: &Path) -> Result<()> {
     if hosts.contains(&"codex") {
         install_codex_mcp(&repo)?;
     }
+    if hosts.contains(&"antigravity") {
+        install_antigravity_config(&repo)?;
+    }
     fs::create_dir_all(repo.join(".sker/rules"))?;
     let body = format!(
         "{START}\nBefore changing code: run `sker consult` for the relevant paths.\nAfter changes: run `sker check` and resolve deterministic BLOCK findings.\n{END}\n"
@@ -43,6 +46,21 @@ pub fn run(path: &Path) -> Result<()> {
         let updated = replace_block(&prior, &body);
         if updated != prior {
             fs::write(p, updated)?;
+        }
+    }
+    if hosts.contains(&"antigravity") {
+        let rule_file = if repo.join(".agent").exists() || !repo.join(".agents").exists() {
+            repo.join(".agent/rules/sker.md")
+        } else {
+            repo.join(".agents/rules/sker.md")
+        };
+        if let Some(parent) = rule_file.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let prior = fs::read_to_string(&rule_file).unwrap_or_default();
+        let updated = replace_block(&prior, &body);
+        if updated != prior {
+            fs::write(rule_file, updated)?;
         }
     }
     let hosts = host_list(&repo);
@@ -68,7 +86,40 @@ fn host_list(repo: &Path) -> Vec<&'static str> {
     {
         v.push("codex")
     }
+    if repo.join(".agent").exists()
+        || repo.join(".agents").exists()
+        || home
+            .as_ref()
+            .is_some_and(|h| h.join(".gemini/antigravity/mcp_config.json").exists())
+    {
+        v.push("antigravity")
+    }
     v
+}
+
+fn install_antigravity_config(_repo: &Path) -> Result<()> {
+    let home = std::env::var_os("HOME").map(std::path::PathBuf::from);
+    if let Some(home) = home {
+        let user_cfg = home.join(".gemini/antigravity/mcp_config.json");
+        if user_cfg.exists() {
+            let content = fs::read(&user_cfg)?;
+            if let Ok(mut json) = serde_json::from_slice::<serde_json::Value>(&content)
+                && let Some(root) = json.as_object_mut()
+            {
+                let servers = root
+                    .entry("mcpServers")
+                    .or_insert_with(|| serde_json::json!({}));
+                if let Some(servers) = servers.as_object_mut() {
+                    servers.insert(
+                        "sker".into(),
+                        serde_json::json!({"command": "sker", "args": ["mcp"]}),
+                    );
+                    fs::write(&user_cfg, serde_json::to_vec_pretty(&json)?)?;
+                }
+            }
+        }
+    }
+    Ok(())
 }
 fn install_mcp_config(repo: &Path) -> Result<()> {
     let path = repo.join(".mcp.json");

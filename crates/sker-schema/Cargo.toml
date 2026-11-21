@@ -3,6 +3,9 @@ name = "sker-schema"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+description = "Sker Schema: core domain models and contracts"
+homepage.workspace = true
+repository.workspace = true
 
 [dependencies]
 serde.workspace = true

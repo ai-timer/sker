@@ -34,7 +34,14 @@ pub struct RuleEntry {
     pub severity: RuleSeverity,
     pub track: RuleTrack,
     pub scope: EntryScope,
+    #[serde(default)]
     pub signals: Vec<RuleSignal>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detector: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ast_rule: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detector_content: Option<String>,
     pub exemptions: Vec<Exemption>,
     pub overrides: Vec<OverrideEdge>,
     pub fixtures: Vec<EntryFixture>,
@@ -84,17 +91,21 @@ impl RuleEntry {
                 "scope.include_paths must not be empty".into(),
             ));
         }
-        if self.signals.is_empty() {
+        let has_detector =
+            self.detector.is_some() || self.ast_rule.is_some() || self.detector_content.is_some();
+        if self.signals.is_empty() && !has_detector {
             return Err(SchemaError::InvalidEntry(
-                "signals must not be empty".into(),
+                "signals or detector must not be empty".into(),
             ));
         }
         for signal in &self.signals {
+            let sig_has_detector =
+                has_detector || signal.detector.is_some() || signal.ast_rule.is_some();
             if !identifier_is_valid(&signal.signal_id, 128)
                 || signal.languages.is_empty()
                 || signal.description.is_empty()
                 || signal.description.len() > 2_000
-                || signal.pattern.is_empty()
+                || (!sig_has_detector && signal.pattern.is_empty())
                 || signal.pattern.len() > 4_096
                 || has_duplicates(&signal.languages)
             {
@@ -232,6 +243,14 @@ impl RuleEntry {
             }
             _ => {}
         }
+        if let Some(ref r) = self.lifecycle.review_by {
+            let is_invalid = r.is_empty() || (!looks_like_datetime(r) && !looks_like_date(r));
+            if is_invalid {
+                return Err(SchemaError::InvalidEntry(
+                    "lifecycle.reviewBy must be a valid date or datetime".into(),
+                ));
+            }
+        }
         for pattern in self
             .scope
             .include_paths
@@ -268,6 +287,17 @@ fn looks_like_datetime(value: &str) -> bool {
                 .rev()
                 .find(|(index, character)| *index > separator && matches!(character, '+' | '-'))
                 .is_some())
+}
+
+fn looks_like_date(value: &str) -> bool {
+    let parts: Vec<&str> = value.split('-').collect();
+    parts.len() == 3
+        && parts[0].len() == 4
+        && parts[0].chars().all(|c| c.is_ascii_digit())
+        && parts[1].len() == 2
+        && parts[1].chars().all(|c| c.is_ascii_digit())
+        && parts[2].len() == 2
+        && parts[2].chars().all(|c| c.is_ascii_digit())
 }
 
 fn fixture_path_is_valid(path: &str) -> bool {
@@ -459,7 +489,12 @@ pub struct RuleSignal {
     pub signal_id: String,
     pub languages: Vec<Language>,
     pub description: String,
+    #[serde(default)]
     pub pattern: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detector: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ast_rule: Option<String>,
 }
 
 #[derive(
@@ -484,6 +519,7 @@ pub enum Language {
     Typescript,
     Yaml,
     Infra,
+    Rust,
     Any,
 }
 
@@ -701,6 +737,8 @@ pub struct Lifecycle {
     pub cooldown_hours: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hotfix_expires_at: Option<String>,
+    #[serde(default, rename = "reviewBy", skip_serializing_if = "Option::is_none")]
+    pub review_by: Option<String>,
 }
 
 #[derive(

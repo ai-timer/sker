@@ -3,6 +3,9 @@ name = "sker-retriever"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+description = "Sker Retriever: lexical and tag-based offline retrieval"
+homepage.workspace = true
+repository.workspace = true
 
 [dependencies]
 sker-schema = { path = "../sker-schema" }
@@ -13,3 +16,10 @@ serde_json.workspace = true
 thiserror.workspace = true
 anyhow.workspace = true
 serde_yaml_ng.workspace = true
+
+[dev-dependencies]
+sker-compiler = { path = "../sker-compiler" }
+
+[[bench]]
+name = "500_rules"
+harness = false

@@ -3,13 +3,14 @@ use crate::BaselineCommand;
 use anyhow::{Context, Result};
 use sker_schema::{AnalysisRequest, DiffEntry, DiffStatus};
 use std::{fs, path::Path, process::Command};
+
 pub fn run(path: &Path, op: BaselineCommand) -> Result<()> {
     let repo = find_repo(path)?;
     let file = repo.join(".sker/baseline.json");
     let mut items = load_baseline(&repo)?;
     match op {
         BaselineCommand::List => println!("{}", serde_json::to_string_pretty(&items)?),
-        BaselineCommand::Freeze | BaselineCommand::Update => {
+        BaselineCommand::Freeze | BaselineCommand::Update | BaselineCommand::Prune => {
             let b = bundle(&repo)?;
             let output = Command::new("git")
                 .current_dir(&repo)
@@ -44,10 +45,29 @@ pub fn run(path: &Path, op: BaselineCommand) -> Result<()> {
                 now: now(),
             };
             let new_items = sker_analyzer::generate_baseline(&b, &req)?;
-            if matches!(op, BaselineCommand::Freeze) {
-                items.clear();
+            match op {
+                BaselineCommand::Freeze => {
+                    items = new_items;
+                }
+                BaselineCommand::Update => {
+                    items = new_items;
+                }
+                BaselineCommand::Prune => {
+                    let prior_count = items.len();
+                    items.retain(|item| {
+                        new_items.iter().any(|curr| {
+                            curr.repository_path == item.repository_path
+                                && curr.rule_id == item.rule_id
+                                && curr.normalized_fragment == item.normalized_fragment
+                        })
+                    });
+                    println!(
+                        "pruned {} resolved baseline item(s)",
+                        prior_count.saturating_sub(items.len())
+                    );
+                }
+                _ => {}
             }
-            items.extend(new_items);
             items.sort_by(|a, b| a.identity().cmp(&b.identity()));
             items.dedup_by(|a, b| a.identity() == b.identity());
             fs::create_dir_all(file.parent().unwrap())?;

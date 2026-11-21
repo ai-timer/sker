@@ -1,3 +1,4 @@
+use clap::CommandFactory;
 use std::{
     fs,
     process::Command,
@@ -19,17 +20,67 @@ fn root() -> std::path::PathBuf {
 }
 #[test]
 fn clap_exposes_expected_command_tree() {
+    // 1. Verify clap command graph invariants and absence of conflicts
+    let app = sker_cli::Cli::command();
+    app.clone().debug_assert();
+
+    // 2. Verify root help output via CLI executable
     let out = Command::new(env!("CARGO_BIN_EXE_sker"))
         .arg("--help")
         .output()
         .unwrap();
     assert!(out.status.success());
     let help = String::from_utf8(out.stdout).unwrap();
-    for command in [
+
+    // Verify slim command help structure
+    for cmd in [
         "compile", "check", "consult", "search", "attest", "propose", "replay", "init", "doctor",
         "baseline", "mcp", "hook",
     ] {
-        assert!(help.contains(command), "missing {command}");
+        assert!(help.contains(cmd), "help missing subcommand {cmd}");
+    }
+
+    // 3. Verify all subcommands exist and have non-empty about descriptions
+    let subcommands = [
+        "compile", "check", "consult", "search", "attest", "propose", "replay", "init", "doctor",
+        "baseline", "mcp", "hook",
+    ];
+    for command in subcommands {
+        assert!(
+            help.contains(command),
+            "missing command in root help: {command}"
+        );
+        let sub_out = Command::new(env!("CARGO_BIN_EXE_sker"))
+            .args([command, "--help"])
+            .output()
+            .unwrap();
+        assert!(
+            sub_out.status.success(),
+            "subcommand --help failed for {command}"
+        );
+        let sub_help = String::from_utf8(sub_out.stdout).unwrap();
+        assert!(
+            !sub_help.trim().is_empty(),
+            "subcommand --help is empty for {command}"
+        );
+        let sub_app = app
+            .find_subcommand(command)
+            .unwrap_or_else(|| panic!("missing clap subcommand {command}"));
+        assert!(
+            sub_app.get_about().is_some() || sub_app.get_long_about().is_some(),
+            "subcommand {command} missing about description"
+        );
+    }
+
+    // 4. Verify baseline nested subcommands have non-empty about
+    let baseline_cmd = app
+        .find_subcommand("baseline")
+        .expect("missing baseline command");
+    for sub in ["freeze", "list", "update"] {
+        let b_sub = baseline_cmd
+            .find_subcommand(sub)
+            .unwrap_or_else(|| panic!("missing baseline subcommand {sub}"));
+        assert!(b_sub.get_about().is_some(), "baseline {sub} missing about");
     }
 }
 #[test]
@@ -52,6 +103,103 @@ fn init_is_idempotent_in_a_clean_repository() {
     assert_eq!(agents.matches("sker:managed:start").count(), 1);
     assert!(p.join(".sker.yaml").exists());
     let _ = fs::remove_dir_all(p);
+}
+
+#[test]
+fn init_and_doctor_support_antigravity_host() {
+    let p = root();
+    fs::create_dir_all(p.join(".agent")).unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_sker"))
+        .args(["init", "--repo"])
+        .arg(&p)
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("antigravity"),
+        "missing antigravity in stdout: {stdout}"
+    );
+
+    let rule_file = p.join(".agent/rules/sker.md");
+    assert!(
+        rule_file.exists(),
+        ".agent/rules/sker.md should be generated"
+    );
+    let content = fs::read_to_string(&rule_file).unwrap();
+    assert!(content.contains("<!-- sker:managed:start -->"));
+    assert!(content.contains("sker consult"));
+    assert!(content.contains("sker check"));
+
+    // Also verify .mcp.json was created with sker mcp
+    let mcp = p.join(".mcp.json");
+    assert!(mcp.exists());
+    let mcp_json: serde_json::Value = serde_json::from_slice(&fs::read(&mcp).unwrap()).unwrap();
+    assert_eq!(mcp_json["mcpServers"]["sker"]["command"], "sker");
+
+    // Create a minimal bundle so doctor bundle check passes
+    fs::create_dir_all(p.join(".sker/rules")).unwrap();
+    let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../examples/sample-playbook/rules/go-no-logging.yaml");
+    fs::copy(source, p.join(".sker/rules/go-no-logging.yaml")).unwrap();
+    let compile = Command::new(env!("CARGO_BIN_EXE_sker"))
+        .args(["compile", "--repo"])
+        .arg(&p)
+        .output()
+        .unwrap();
+    assert!(compile.status.success());
+
+    let doctor = Command::new(env!("CARGO_BIN_EXE_sker"))
+        .args(["doctor", "--repo"])
+        .arg(&p)
+        .output()
+        .unwrap();
+    assert!(
+        doctor.status.success(),
+        "doctor failed: stderr={}, stdout={}",
+        String::from_utf8_lossy(&doctor.stderr),
+        String::from_utf8_lossy(&doctor.stdout)
+    );
+    let doc_stdout = String::from_utf8_lossy(&doctor.stdout);
+    assert!(doc_stdout.contains("PASS Antigravity configuration"));
+
+    let _ = fs::remove_dir_all(p);
+}
+
+#[test]
+fn init_detects_and_updates_antigravity_home_mcp_config() {
+    let p = root();
+    let home = root();
+    let ag_dir = home.join(".gemini/antigravity");
+    fs::create_dir_all(&ag_dir).unwrap();
+    let mcp_cfg = ag_dir.join("mcp_config.json");
+    fs::write(&mcp_cfg, "{\"mcpServers\":{}}").unwrap();
+
+    let out = Command::new(env!("CARGO_BIN_EXE_sker"))
+        .args(["init", "--repo"])
+        .arg(&p)
+        .env("HOME", &home)
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("antigravity"));
+
+    let updated_cfg: serde_json::Value =
+        serde_json::from_slice(&fs::read(&mcp_cfg).unwrap()).unwrap();
+    assert_eq!(updated_cfg["mcpServers"]["sker"]["command"], "sker");
+    assert_eq!(updated_cfg["mcpServers"]["sker"]["args"][0], "mcp");
+
+    let _ = fs::remove_dir_all(p);
+    let _ = fs::remove_dir_all(home);
 }
 #[test]
 fn baseline_list_is_empty_for_clean_repository() {
@@ -227,10 +375,12 @@ fn baseline_anchors_survive_line_shifts_when_header_lines_added() {
         "services/payments/main.go"
     );
     assert!(baseline_items[0]["syntax_anchor"].is_string());
-    assert!(!baseline_items[0]["normalized_fragment"]
-        .as_str()
-        .unwrap()
-        .is_empty());
+    assert!(
+        !baseline_items[0]["normalized_fragment"]
+            .as_str()
+            .unwrap()
+            .is_empty()
+    );
 
     git(&["add", "."]);
     git(&["commit", "-qm", "commit compiled bundle and baseline"]);
@@ -289,6 +439,146 @@ fn baseline_anchors_survive_line_shifts_when_header_lines_added() {
         String::from_utf8_lossy(&check.stderr)
     );
     assert_eq!(value["status"], "passed");
+
+    let _ = fs::remove_dir_all(repo);
+}
+
+#[test]
+fn baseline_prune_removes_resolved_violations() {
+    let repo = root();
+    fs::create_dir_all(repo.join(".sker/rules")).unwrap();
+    fs::create_dir_all(repo.join("services/payments")).unwrap();
+    let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../examples/sample-playbook/rules/go-no-logging.yaml");
+    fs::copy(source, repo.join(".sker/rules/go-no-logging.yaml")).unwrap();
+    let file = repo.join("services/payments/main.go");
+    fs::write(
+        &file,
+        "package payments\nimport \"fmt\"\nfunc f() {\n\tfmt.Printf(\"secret %s\", \"x\")\n}\n",
+    )
+    .unwrap();
+
+    let git = |args: &[&str]| {
+        let out = Command::new("git")
+            .args(args)
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        assert!(out.status.success());
+    };
+    git(&["init", "-q"]);
+    git(&["config", "user.email", "sker-test@example.invalid"]);
+    git(&["config", "user.name", "Sker Test"]);
+    git(&["add", "."]);
+    git(&["commit", "-qm", "initial commit"]);
+
+    let compile = Command::new(env!("CARGO_BIN_EXE_sker"))
+        .args(["compile", "--repo"])
+        .arg(&repo)
+        .output()
+        .unwrap();
+    assert!(compile.status.success());
+
+    let freeze = Command::new(env!("CARGO_BIN_EXE_sker"))
+        .args(["baseline", "--repo"])
+        .arg(&repo)
+        .arg("freeze")
+        .output()
+        .unwrap();
+    assert!(freeze.status.success());
+
+    let baseline_path = repo.join(".sker/baseline.json");
+    let baseline_before: Vec<serde_json::Value> =
+        serde_json::from_slice(&fs::read(&baseline_path).unwrap()).unwrap();
+    assert_eq!(
+        baseline_before.len(),
+        1,
+        "baseline must contain 1 frozen item"
+    );
+
+    // Fix the violation in the file
+    fs::write(&file, "package payments\nfunc f() {\n\t// resolved\n}\n").unwrap();
+    git(&["add", "."]);
+    git(&["commit", "-qm", "fix violation"]);
+
+    // Run baseline prune
+    let prune = Command::new(env!("CARGO_BIN_EXE_sker"))
+        .args(["baseline", "--repo"])
+        .arg(&repo)
+        .arg("prune")
+        .output()
+        .unwrap();
+    assert!(
+        prune.status.success(),
+        "prune must succeed: {}",
+        String::from_utf8_lossy(&prune.stderr)
+    );
+
+    let baseline_after: Vec<serde_json::Value> =
+        serde_json::from_slice(&fs::read(&baseline_path).unwrap()).unwrap();
+    assert_eq!(
+        baseline_after.len(),
+        0,
+        "resolved item must be pruned from baseline"
+    );
+
+    let _ = fs::remove_dir_all(repo);
+}
+
+#[test]
+fn attest_default_args_does_not_crash_on_parsing() {
+    let repo = root();
+    fs::create_dir_all(repo.join(".sker/rules")).unwrap();
+    let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../examples/sample-playbook/rules/go-no-logging.yaml");
+    fs::copy(source, repo.join(".sker/rules/go-no-logging.yaml")).unwrap();
+    let git = |args: &[&str]| {
+        let out = Command::new("git")
+            .args(args)
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    };
+    git(&["init", "-q"]);
+    git(&["config", "user.email", "sker-test@example.invalid"]);
+    git(&["config", "user.name", "Sker Test"]);
+    git(&["add", "."]);
+    git(&["commit", "-qm", "initial"]);
+    fs::write(repo.join("test.txt"), "hello\n").unwrap();
+    git(&["add", "."]);
+    git(&["commit", "-qm", "change"]);
+
+    let compile = Command::new(env!("CARGO_BIN_EXE_sker"))
+        .args(["compile", "--repo"])
+        .arg(&repo)
+        .output()
+        .unwrap();
+    assert!(compile.status.success());
+
+    // Calling attest with no --semantic should use default "[]" and succeed without crashing on JSON parsing
+    let attest = Command::new(env!("CARGO_BIN_EXE_sker"))
+        .args(["attest", "--repo"])
+        .arg(&repo)
+        .output()
+        .unwrap();
+
+    let stderr = String::from_utf8_lossy(&attest.stderr);
+    assert!(
+        !stderr.contains("invalid type: map, expected a sequence"),
+        "attest must not fail with map deserialization error: {stderr}"
+    );
+    assert!(
+        attest.status.success(),
+        "attest should succeed with 0: {stderr}"
+    );
+    let stdout = String::from_utf8_lossy(&attest.stdout);
+    let cred: serde_json::Value = serde_json::from_str(&stdout).expect("valid JSON credential");
+    assert_eq!(cred["schema_version"], "sker.agent-credential/v1");
 
     let _ = fs::remove_dir_all(repo);
 }

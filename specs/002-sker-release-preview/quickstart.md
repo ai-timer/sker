@@ -56,6 +56,43 @@ Before merge, run the Constitution's workspace gates:
 ```sh
 cargo test --workspace
 cargo clippy --workspace -- -D warnings
+action/scripts/test-action.sh
 ```
 
 Expected: unit and boundary tests pass for every crate; each deterministic rule has passing positive and negative fixtures. Blocking build and fast-check p95 acceptance targets are macOS arm64/x86_64 and Linux x86_64/arm64. Windows remains a pure-Rust/no-C-dependency source-compatibility target and is non-blocking for Preview v0.1.
+
+## Release Distribution Matrix and Platform Compatibility
+
+Sker Release Preview v0.1 provides zero-C-dependency static binaries configured via `dist-workspace.toml` and GitHub Actions release pipelines (`.github/workflows/release.yml`).
+
+### Supported Target Platforms
+
+| Platform Target | Tier / Status | Distribution Artifacts | Verification Command |
+|---|---|---|---|
+| `aarch64-apple-darwin` | Tier 1 (Blocking) | `.tar.xz`, Shell installer, Homebrew Tap | `cargo check --target aarch64-apple-darwin` / `dist plan` |
+| `x86_64-apple-darwin` | Tier 1 (Blocking) | `.tar.xz`, Shell installer, Homebrew Tap | `cargo check --target x86_64-apple-darwin` / `dist plan` |
+| `x86_64-unknown-linux-gnu` | Tier 1 (Blocking) | `.tar.xz`, Shell installer, Homebrew Tap | `cargo check --target x86_64-unknown-linux-gnu` / `dist plan` |
+| `aarch64-unknown-linux-gnu` | Tier 1 (Blocking) | `.tar.xz`, Shell installer, Homebrew Tap | `cargo check --target aarch64-unknown-linux-gnu` / `dist plan` |
+| `x86_64-pc-windows-msvc` | Tier 2 (Non-blocking) | Pure-Rust source compatible | `cargo check --workspace` |
+
+### Non-blocking Windows Source-Compatibility Check
+
+Windows is supported as a pure-Rust source-compatible target. Because Sker rejects C-linked dependencies (`openssl-sys`, `libgit2`, etc.) in accordance with Constitution Principle V and Rust Constraints, Windows builds do not require external C compilers, vcpkg, or OpenSSL toolchains:
+
+```sh
+# Verify pure-Rust workspace compilation without C-linkage
+cargo check --workspace
+# Confirm absence of C-linked OpenSSL
+cargo tree -i openssl-sys  # Must report empty / no matches
+```
+
+### Installation Channels
+
+- **Shell Installer**:
+  ```sh
+  curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ai-timer/sker/releases/latest/download/sker-cli-installer.sh | sh
+  ```
+- **Homebrew Tap**:
+  ```sh
+  brew install ai-timer/tap/sker
+  ```

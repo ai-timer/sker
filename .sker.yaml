@@ -1,0 +1,8 @@
+hosts:
+- claude
+- codex
+- antigravity
+languages:
+- rust
+rules: []
+schema_version: sker.config/v1

@@ -13,7 +13,7 @@ fn sample_deterministic_rule_positive_and_negative_fixtures_pass() {
         .into_iter()
         .filter(|r| r.track == RuleTrack::Deterministic)
         .collect();
-    assert_eq!(deterministic.len(), 1);
+    assert_eq!(deterministic.len(), 3);
     validate_fixtures(&deterministic).unwrap();
 }
 

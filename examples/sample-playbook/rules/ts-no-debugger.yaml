@@ -1,0 +1,40 @@
+schema_version: sker.entry/v1
+rule_id: ts.no-debugger
+version: 1.0.0
+title: Disallow debugger statements in TypeScript
+domain: quality.debugging
+description: Do not leave debugger statements in production TypeScript code.
+rationale: Debugger statements pause execution and should not be committed to repositories.
+severity: BLOCK
+track: deterministic
+scope:
+  include_paths:
+    - "**/*.ts"
+    - "**/*.tsx"
+detector: detectors/ts-no-debugger.yaml
+signals:
+  - signal_id: ts-debugger-stmt
+    languages: [typescript]
+    description: A debugger statement in TypeScript code.
+    pattern: "debugger"
+exemptions: []
+overrides: []
+fixtures:
+  - fixture_id: debugger-statement
+    polarity: positive
+    path: examples/sample-playbook/fixtures/ts-no-debugger/positive/debug.ts
+    expected: trigger
+  - fixture_id: safe-ts-return
+    polarity: negative
+    path: examples/sample-playbook/fixtures/ts-no-debugger/negative/safe.ts
+    expected: no_trigger
+compliant_alternatives:
+  - "// remove debugger before commit"
+  - "console.debug(...)"
+lifecycle:
+  kind: ordinary
+  cooldown_hours: 24
+consult:
+  synonyms: [debugger, breakpoint]
+  keywords: [typescript, debugging, debugger]
+tags: [typescript, deterministic]

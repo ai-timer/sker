@@ -42,10 +42,7 @@ pub fn compile_repository_rules(
         content_hash,
     };
     let request = CompileRequest {
-        sources: vec![sker_schema::RuleSource {
-            lock,
-            rules,
-        }],
+        sources: vec![sker_schema::RuleSource { lock, rules }],
         compiler_version,
     };
     compile(&request)

@@ -115,6 +115,8 @@ fn credential_digest_uses_stable_canonical_json_and_excludes_its_own_field() {
             state: SemanticVerdictState::Comply,
             declaration: "notification path is idempotent".into(),
             rationale_digest: None,
+            evidence_path: None,
+            evidence_line: None,
         }],
         issuer: CredentialIssuer::LocalCli,
         created_at: "2026-11-18T00:00:00Z".into(),

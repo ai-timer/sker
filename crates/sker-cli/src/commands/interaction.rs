@@ -1,6 +1,5 @@
 use super::{atomic_json, bundle, find_repo, now};
 use anyhow::{Context, Result, bail};
-use serde_json::json;
 use sker_retriever::IntentRetriever;
 use sker_schema::*;
 use std::{
@@ -9,9 +8,14 @@ use std::{
     path::Path,
 };
 
-pub fn consult(path: &Path, intent: &str, paths: &[String]) -> Result<()> {
+pub fn consult(
+    path: &Path,
+    bundle_override: Option<&Path>,
+    intent: &str,
+    paths: &[String],
+) -> Result<()> {
     let repo = find_repo(path)?;
-    let b = bundle(&repo)?;
+    let b = super::support::bundle_with_override(&repo, bundle_override)?;
     validate_query_paths(paths)?;
     let retriever = sker_retriever::TantivyRetriever::default();
     let query = ConsultQuery {
@@ -21,11 +25,13 @@ pub fn consult(path: &Path, intent: &str, paths: &[String]) -> Result<()> {
         minimum_score: None,
     };
     let res = retriever.consult(&b, &query)?;
-    super::telemetry::report_event_async(
+    super::telemetry::report_event_with_counters_async(
         &repo,
         "consult",
         &b.bundle_sha256,
         0,
+        Some(res.matches.len() as u64),
+        Some(1),
         if res.matches.is_empty() {
             "no_data"
         } else {
@@ -36,9 +42,9 @@ pub fn consult(path: &Path, intent: &str, paths: &[String]) -> Result<()> {
     Ok(())
 }
 
-pub fn search(path: &Path, query: &str) -> Result<()> {
+pub fn search(path: &Path, bundle_override: Option<&Path>, query: &str) -> Result<()> {
     let repo = find_repo(path)?;
-    let b = bundle(&repo)?;
+    let b = super::support::bundle_with_override(&repo, bundle_override)?;
     let retriever = sker_retriever::TantivyRetriever::default();
     let q = SearchQuery {
         query: query.to_string(),
@@ -81,6 +87,9 @@ pub fn attest(path: &Path, semantic: &str, output: Option<&Path>) -> Result<()> 
             bail!("missing semantic declaration for {id}")
         }
     }
+    let has_escalate = semantic_verdicts
+        .iter()
+        .any(|v| v.state == SemanticVerdictState::Escalate);
     let credential = sker_mcp::attest::issue(
         b.bundle_sha256.clone(),
         hash,
@@ -90,7 +99,16 @@ pub fn attest(path: &Path, semantic: &str, output: Option<&Path>) -> Result<()> 
         now(),
     )
     .map_err(|e| anyhow::anyhow!("{e}"))?;
-    super::telemetry::report_event_async(&repo, "attest", &b.bundle_sha256, 0, "pass");
+    let outcome = if has_escalate { "escalate" } else { "pass" };
+    super::telemetry::report_event_with_counters_async(
+        &repo,
+        "attest",
+        &b.bundle_sha256,
+        0,
+        None,
+        Some(credential.consult_trace.len() as u64),
+        outcome,
+    );
     if let Some(out) = output {
         atomic_json(out, &credential)?;
     } else {
@@ -116,7 +134,10 @@ pub fn propose(path: &Path, entry: &Path, rationale: &str) -> Result<()> {
     };
     let pdir = repo.join(".sker/proposals");
     fs::create_dir_all(&pdir)?;
-    atomic_json(&pdir.join(format!("{}.json", proposal.proposal_id)), &proposal)?;
+    atomic_json(
+        &pdir.join(format!("{}.json", proposal.proposal_id)),
+        &proposal,
+    )?;
     super::telemetry::report_event_async(&repo, "proposal", &b.bundle_sha256, 0, "pass");
     println!("saved proposal {}", proposal.proposal_id);
     Ok(())
@@ -136,11 +157,31 @@ pub fn replay(path: &Path, from: &str, to: &str) -> Result<()> {
             if rev.is_empty() {
                 continue;
             }
+            let diff_res =
+                sker_analyzer::extract_diff(repo.to_str().unwrap_or("."), &format!("{rev}^"), rev);
+            let mut triggered = Vec::new();
+            let mut complete = true;
+            if let Ok(diff) = diff_res {
+                let req = AnalysisRequest {
+                    repository_root: repo.to_string_lossy().into_owned(),
+                    base_revision: format!("{rev}^"),
+                    head_revision: rev.to_string(),
+                    diff,
+                    baseline: vec![],
+                    now: now(),
+                };
+                if let Ok(report) = sker_analyzer::Analyzer.analyze(&b, &req) {
+                    triggered = report.findings.into_iter().map(|f| f.rule_id).collect();
+                    complete = report.analysis.complete;
+                }
+            } else {
+                triggered = b.rules.iter().map(|r| r.rule_id.clone()).collect();
+            }
             commits.push(sker_analyzer::ReplayCommit {
                 revision: rev.to_string(),
                 bundle_sha256: b.bundle_sha256.clone(),
-                rule_ids: b.rules.iter().map(|r| r.rule_id.clone()).collect(),
-                complete: true,
+                rule_ids: triggered,
+                complete,
             });
         }
     }
@@ -159,7 +200,7 @@ pub async fn mcp(repo: &Path) -> Result<()> {
 }
 
 pub fn hook(repo: &Path, hard_block: bool) -> Result<()> {
-    let _ = find_repo(repo)?;
+    let repo_path = find_repo(repo)?;
     let mut input_str = String::new();
     let _ = io::stdin().read_to_string(&mut input_str);
     let input: sker_mcp::PreToolUseInput = if input_str.trim().is_empty() {
@@ -175,18 +216,9 @@ pub fn hook(repo: &Path, hard_block: bool) -> Result<()> {
             tool_input: None,
         })
     };
-    let output = sker_mcp::hook::handle(&input);
-    let delivery_status = "delivered";
-    let is_blocked = hard_block && !output.hook_specific_output.additional_context.is_empty();
-    println!(
-        "{}",
-        json!({
-            "hookSpecificOutput": output.hook_specific_output,
-            "delivery_status": delivery_status,
-            "blocked": is_blocked,
-        })
-    );
-    if is_blocked {
+    let output = sker_mcp::hook::handle_with_repo(&input, Some(&repo_path));
+    println!("{}", serde_json::to_string(&output)?);
+    if hard_block && output.is_blocking_violation {
         std::process::exit(1);
     }
     Ok(())

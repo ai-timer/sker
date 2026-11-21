@@ -24,7 +24,7 @@ fn temp(name: &str) -> PathBuf {
 #[test]
 fn sample_playbook_federated_load_compile_and_archive_roundtrip() {
     let source = sample();
-    assert_eq!(source.rules.len(), 2);
+    assert_eq!(source.rules.len(), 4);
     let central = RuleSource {
         lock: SourceLock {
             kind: RuleSourceKind::CentralPlaybook,

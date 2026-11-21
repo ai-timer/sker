@@ -3,6 +3,13 @@ name = "sker-cli"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+description = "Sker CLI: offline-first architectural rule engine and agent gate"
+homepage.workspace = true
+repository.workspace = true
+
+[lib]
+name = "sker_cli"
+path = "src/lib.rs"
 
 [[bin]]
 name = "sker"

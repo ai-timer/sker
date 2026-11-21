@@ -50,6 +50,10 @@ pub struct SemanticVerdict {
     pub declaration: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rationale_digest: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evidence_path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evidence_line: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -133,12 +137,16 @@ pub fn credential_blake3(credential: &AgentCredential) -> Result<String, serde_j
         fields.remove("credential_blake3");
         if let Some(Value::Array(verdicts)) = fields.get_mut("semantic_verdicts") {
             for verdict in verdicts {
-                if let Value::Object(fields) = verdict
-                    && fields
-                        .get("rationale_digest")
-                        .is_some_and(Value::is_null)
-                {
-                    fields.remove("rationale_digest");
+                if let Value::Object(fields) = verdict {
+                    if fields.get("rationale_digest").is_some_and(Value::is_null) {
+                        fields.remove("rationale_digest");
+                    }
+                    if fields.get("evidence_path").is_some_and(Value::is_null) {
+                        fields.remove("evidence_path");
+                    }
+                    if fields.get("evidence_line").is_some_and(Value::is_null) {
+                        fields.remove("evidence_line");
+                    }
                 }
             }
         }

@@ -21,6 +21,37 @@ fi
 # A credential is evidence even if it is stale or malformed; verification then fails closed.
 if [[ -f "$credential" ]]; then agent_evidence=true; reason=credential_file; fi
 
+# Check Git commit logs / trailers for Agent co-authorship or Sker-Agent trailers
+if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  # In shallow clones, attempt to fetch recent commit history if possible
+  if git rev-parse --is-shallow-repository 2>/dev/null | grep -q true; then
+    if [[ -n "${GITHUB_BASE_REF:-}" ]]; then
+      git fetch origin "$GITHUB_BASE_REF" --depth=50 --no-tags 2>/dev/null || true
+    fi
+    git fetch --depth=50 --no-tags 2>/dev/null || true
+  fi
+  commit_trailers="$(git log -n 50 --format="%B" 2>/dev/null || git log -1 --format="%B" 2>/dev/null || true)"
+  if [[ -n "$commit_trailers" ]]; then
+    if echo "$commit_trailers" | grep -Ei "(Co-authored-by|Sker-Agent):.*(claude|codex|copilot|antigravity|cursor|gemini|openai|anthropic|sker-agent)" >/dev/null; then
+      agent_evidence=true
+      reason=commit_trailer
+    fi
+  fi
+fi
+
+# Also check commits array in event_path if present (e.g. push event)
+if [[ "$agent_evidence" == false && -n "$event_path" && -f "$event_path" ]]; then
+  if node - "$event_path" <<'NODE'
+const fs = require('node:fs');
+const e = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+const commits = e.commits || [];
+const pattern = /(?:co-authored-by|sker-agent):.*(?:claude|codex|copilot|antigravity|cursor|gemini|openai|anthropic|sker-agent)/i;
+const matched = commits.some(c => pattern.test(c.message || ''));
+process.exit(matched ? 0 : 1);
+NODE
+  then agent_evidence=true; reason=commit_trailer; fi
+fi
+
 actor=human
 if [[ "$agent_evidence" == true ]]; then actor=agent; fi
 # The declaration is informational only. It can never suppress independently observed evidence.

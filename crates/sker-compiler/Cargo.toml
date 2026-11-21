@@ -3,6 +3,9 @@ name = "sker-compiler"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+description = "Sker Compiler: rule verification and bundle compiler"
+homepage.workspace = true
+repository.workspace = true
 
 [dependencies]
 sker-schema = { path = "../sker-schema" }
@@ -13,6 +16,7 @@ serde.workspace = true
 serde_json.workspace = true
 serde_yaml_ng.workspace = true
 rkyv.workspace = true
+sha2.workspace = true
 blake3.workspace = true
 globset.workspace = true
 thiserror.workspace = true

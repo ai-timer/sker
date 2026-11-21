@@ -115,4 +115,38 @@ NODE
   if [[ "$case" != human && "$got" != agent ]]; then exit 1; fi
 done
 
+# Adversarial test: no agent-authored label, no credential, but commit has Co-authored-by: Codex ...
+# Must classify as agent and then verify-pr.sh must block.
+adv_repo="$tmp/adv-repo"
+mkdir -p "$adv_repo"
+git -C "$adv_repo" init -q -b main
+git -C "$adv_repo" config user.email "test@example.com"
+git -C "$adv_repo" config user.name "Tester"
+echo "hello" > "$adv_repo/file.txt"
+git -C "$adv_repo" add .
+git -C "$adv_repo" commit -qm "feat: some changes
+
+Co-authored-by: Codex <codex@openai.com>"
+
+ev_adv="$tmp/event-adv.json"
+node - "$ev_adv" <<'NODE'
+const fs=require('node:fs');
+fs.writeFileSync(process.argv[2], JSON.stringify({pull_request:{labels:[],body:''}}));
+NODE
+
+(
+  cd "$adv_repo"
+  export GH_EVENT_PATH="$ev_adv" INPUT_CREDENTIAL_FILE="$adv_repo/.sker/credential.json" INPUT_AGENT_LABEL=agent-authored GITHUB_OUTPUT="$tmp/classify-adv-out"
+  bash "$root/scripts/classify-pr.sh"
+)
+adv_actor="$(sed -n 's/^actor=//p' "$tmp/classify-adv-out" | tail -1)"
+[[ "$adv_actor" == "agent" ]] || { echo "Adversarial PR with Co-authored-by was not classified as agent (got $adv_actor)" >&2; exit 1; }
+
+# verify-pr.sh without credential must block for this classified agent PR
+set +e
+SKER_ACTOR="$adv_actor" SKER_EXIT_CODE=0 INPUT_CREDENTIAL_FILE="$adv_repo/.sker/credential.json" INPUT_REPORT_FILE="$tmp/comment-report.json" bash "$root/scripts/verify-pr.sh" >/dev/null 2>&1
+adv_verify_code=$?
+set -e
+[[ "$adv_verify_code" -ne 0 ]] || { echo "Adversarial Agent PR unexpectedly passed verify-pr.sh without credential" >&2; exit 1; }
+
 echo "Action syntax and 0/1/2 × Agent/human gate matrix passed."

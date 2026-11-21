@@ -11,4 +11,4 @@ pub use fixtures::validate_fixtures;
 pub use projections::{Projection, project_guidance, write_projections};
 pub use publish::{publish_bundle, write_bundle_archive};
 pub use sker_schema::BundleCompiler;
-pub use sources::{load_playbook, load_sources};
+pub use sources::{LockFile, LockSource, load_federated_sources, load_playbook, load_sources};

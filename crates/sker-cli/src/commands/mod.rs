@@ -12,8 +12,14 @@ use anyhow::Result;
 
 pub async fn run(command: Command) -> Result<()> {
     match command {
-        Command::Compile { repo } => compile::run(&repo),
+        Command::Compile {
+            repo,
+            playbook,
+            out,
+            update_lock,
+        } => compile::run(&repo, playbook.as_deref(), out.as_deref(), update_lock),
         Command::Check {
+            bundle,
             repo,
             ci,
             sarif,
@@ -22,6 +28,7 @@ pub async fn run(command: Command) -> Result<()> {
             credential,
         } => check::run(
             &repo,
+            bundle.as_deref(),
             ci,
             sarif.as_deref(),
             json.as_deref(),
@@ -29,11 +36,30 @@ pub async fn run(command: Command) -> Result<()> {
             credential.as_deref(),
         ),
         Command::Consult {
+            bundle,
             intent,
-            paths,
+            named_paths,
+            pos_intent,
+            pos_paths,
             repo,
-        } => interaction::consult(&repo, &intent, &paths),
-        Command::Search { query, repo } => interaction::search(&repo, &query),
+        } => {
+            let actual_intent = intent.or(pos_intent).unwrap_or_default();
+            let actual_paths = if !named_paths.is_empty() {
+                named_paths
+            } else {
+                pos_paths
+            };
+            interaction::consult(&repo, bundle.as_deref(), &actual_intent, &actual_paths)
+        }
+        Command::Search {
+            bundle,
+            query,
+            pos_query,
+            repo,
+        } => {
+            let actual_query = query.or(pos_query).unwrap_or_default();
+            interaction::search(&repo, bundle.as_deref(), &actual_query)
+        }
         Command::Attest {
             repo,
             semantic,

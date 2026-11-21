@@ -27,6 +27,6 @@ lifecycle:
   kind: ordinary
   cooldown_hours: 24
 consult:
-  synonyms: [event delivery, outbox, notification fanout, idempotent consumer]
-  keywords: [cross-service, notification, reliability]
+  synonyms: [event delivery, outbox, notification fanout, idempotent consumer, 异步通知, 异步事件, 跨服务事件]
+  keywords: [cross-service, notification, reliability, 跨服务通知, 异步事件, 跨服务]
 tags: [semantic, architecture, multi-language]

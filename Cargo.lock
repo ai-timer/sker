@@ -3774,6 +3774,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml_ng",
+ "sha2 0.10.9",
  "sker-schema",
  "thiserror",
 ]
@@ -3798,6 +3799,8 @@ version = "0.1.0-preview"
 dependencies = [
  "anyhow",
  "blake3",
+ "globset",
+ "rkyv",
  "rmcp",
  "schemars",
  "serde",
@@ -3818,6 +3821,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml_ng",
+ "sker-compiler",
  "sker-schema",
  "tantivy",
  "thiserror",

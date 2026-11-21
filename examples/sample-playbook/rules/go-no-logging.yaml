@@ -10,6 +10,7 @@ track: deterministic
 scope:
   include_paths:
     - "services/**/*.go"
+detector: detectors/go-no-logging.yaml
 signals:
   - signal_id: fmt-printf-call
     languages: [go]

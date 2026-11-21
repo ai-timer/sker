@@ -14,6 +14,10 @@ members = [
 version = "0.1.0-preview"
 edition = "2024"
 license = "Apache-2.0"
+readme = "README.md"
+homepage = "https://github.com/ai-timer/sker"
+repository = "https://github.com/ai-timer/sker"
+description = "Sker: offline-first negative knowledge guardrails and auditable compliance compiler for AI coding agents"
 
 [workspace.dependencies]
 # 核心分析与协议
@@ -54,3 +58,8 @@ sqlx = { version = "0.8", features = [
   "json",
   "chrono",
 ] }
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"

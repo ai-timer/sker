@@ -9,6 +9,11 @@ use std::{
 pub fn find_repo(path: &Path) -> Result<PathBuf> {
     let p = fs::canonicalize(path)
         .with_context(|| format!("repository not found: {}", path.display()))?;
+    if p.is_file()
+        && let Some(parent) = p.parent()
+    {
+        return Ok(parent.to_path_buf());
+    }
     if !p.is_dir() {
         bail!("repository path is not a directory")
     };
@@ -42,13 +47,25 @@ pub fn load_rules(repo: &Path) -> Result<Vec<RuleEntry>> {
     if rules.exists() {
         collect_rules(&rules, &mut files)?;
     }
-    if files.is_empty() && repo.join("sker.yaml").exists() {
-        let cfg: serde_yaml_ng::Value =
-            serde_yaml_ng::from_slice(&fs::read(repo.join("sker.yaml"))?)?;
+    // Check .sker.yaml first (standard project root config), then fallback to sker.yaml (playbook manifest)
+    let cfg_file = if repo.join(".sker.yaml").exists() {
+        Some(repo.join(".sker.yaml"))
+    } else if repo.join("sker.yaml").exists() {
+        Some(repo.join("sker.yaml"))
+    } else {
+        None
+    };
+    if let Some(cfg_path) = cfg_file {
+        let cfg: serde_yaml_ng::Value = serde_yaml_ng::from_slice(
+            &fs::read(&cfg_path).with_context(|| format!("reading {}", cfg_path.display()))?,
+        )?;
         if let Some(list) = cfg.get("rules").and_then(|v| v.as_sequence()) {
             for p in list {
                 if let Some(s) = p.as_str() {
-                    files.push(repo.join(s));
+                    let rule_path = repo.join(s);
+                    if !files.contains(&rule_path) {
+                        files.push(rule_path);
+                    }
                 }
             }
         }
@@ -56,10 +73,47 @@ pub fn load_rules(repo: &Path) -> Result<Vec<RuleEntry>> {
     let mut out = Vec::new();
     for f in files {
         let b = fs::read(&f).with_context(|| format!("reading {}", f.display()))?;
-        out.push(
-            serde_yaml_ng::from_slice(&b)
-                .with_context(|| format!("parsing rule {}", f.display()))?,
-        );
+        let mut entry: RuleEntry = serde_yaml_ng::from_slice(&b)
+            .with_context(|| format!("parsing rule {}", f.display()))?;
+        let det_ref = entry
+            .detector
+            .as_deref()
+            .or(entry.ast_rule.as_deref())
+            .or_else(|| {
+                entry
+                    .signals
+                    .iter()
+                    .find_map(|s| s.detector.as_deref().or(s.ast_rule.as_deref()))
+            });
+        if let Some(det_path) = det_ref
+            && entry.detector_content.is_none()
+        {
+            let p1 = repo.join(det_path);
+            let p2 = f.parent().map(|p| p.join(det_path));
+            let p3 = f
+                .parent()
+                .and_then(|p| p.parent())
+                .map(|p| p.join(det_path));
+            let content = if p1.exists() {
+                fs::read_to_string(&p1).ok()
+            } else if let Some(ref p) = p2.filter(|p| p.exists()) {
+                fs::read_to_string(p).ok()
+            } else if let Some(ref p) = p3.filter(|p| p.exists()) {
+                fs::read_to_string(p).ok()
+            } else if det_path.contains('\n')
+                || (det_path.contains(':')
+                    && !det_path.ends_with(".yaml")
+                    && !det_path.ends_with(".yml"))
+            {
+                Some(det_path.to_string())
+            } else {
+                None
+            };
+            if let Some(c) = content {
+                entry.detector_content = Some(c);
+            }
+        }
+        out.push(entry);
     }
     Ok(out)
 }
@@ -76,13 +130,90 @@ fn collect_rules(dir: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
     Ok(())
 }
 pub fn bundle(repo: &Path) -> Result<RuleBundle> {
-    let path = repo.join(".sker/bundle.json");
-    let b: RuleBundle = serde_json::from_slice(
-        &fs::read(&path)
-            .with_context(|| format!("missing bundle {}; run `sker compile`", path.display()))?,
-    )?;
-    b.validate()?;
-    Ok(b)
+    bundle_with_override(repo, None)
+}
+
+pub fn bundle_with_override(repo: &Path, bundle_override: Option<&Path>) -> Result<RuleBundle> {
+    if let Some(p) = bundle_override {
+        if p.is_file() {
+            if p.extension().is_some_and(|ext| ext == "json") {
+                let b: RuleBundle = serde_json::from_slice(&fs::read(p)?)?;
+                b.validate()?;
+                let expected_hash = sker_schema::compute_bundle_sha256(&b.sources, &b.rules)?;
+                if b.bundle_sha256 != expected_hash {
+                    bail!(
+                        "bundle sha256 mismatch: recorded {}, computed {}",
+                        b.bundle_sha256,
+                        expected_hash
+                    );
+                }
+                return Ok(b);
+            }
+            let bytes =
+                fs::read(p).with_context(|| format!("reading bundle archive {}", p.display()))?;
+            let b = sker_schema::validate_bundle_archive(&bytes)
+                .map_err(|e| anyhow::anyhow!("corrupt bundle archive: {e}"))?;
+            let expected_hash = sker_schema::compute_bundle_sha256(&b.sources, &b.rules)
+                .map_err(|e| anyhow::anyhow!("bundle sha256 computation failed: {e}"))?;
+            if b.bundle_sha256 != expected_hash {
+                bail!(
+                    "bundle archive sha256 mismatch: recorded {}, computed {}",
+                    b.bundle_sha256,
+                    expected_hash
+                );
+            }
+            return Ok(b);
+        } else if p.is_dir() {
+            let rkyv_path = p.join("bundle.rkyv");
+            if rkyv_path.exists() {
+                return bundle_with_override(repo, Some(&rkyv_path));
+            }
+            let json_path = p.join("bundle.json");
+            if json_path.exists() {
+                return bundle_with_override(repo, Some(&json_path));
+            }
+        }
+    }
+    let rkyv_path = repo.join(".sker/bundle.rkyv");
+    if rkyv_path.exists() {
+        let bytes = fs::read(&rkyv_path)
+            .with_context(|| format!("reading bundle archive {}", rkyv_path.display()))?;
+        let b = sker_schema::validate_bundle_archive(&bytes)
+            .map_err(|e| anyhow::anyhow!("corrupt bundle archive: {e}"))?;
+        let expected_hash = sker_schema::compute_bundle_sha256(&b.sources, &b.rules)
+            .map_err(|e| anyhow::anyhow!("bundle sha256 computation failed: {e}"))?;
+        if b.bundle_sha256 != expected_hash {
+            bail!(
+                "bundle archive sha256 mismatch: recorded {}, computed {}",
+                b.bundle_sha256,
+                expected_hash
+            );
+        }
+        return Ok(b);
+    }
+    let json_path = repo.join(".sker/bundle.json");
+    if json_path.exists() {
+        let b: RuleBundle = serde_json::from_slice(
+            &fs::read(&json_path)
+                .with_context(|| format!("reading bundle {}", json_path.display()))?,
+        )?;
+        b.validate()?;
+        let expected_hash = sker_schema::compute_bundle_sha256(&b.sources, &b.rules)
+            .map_err(|e| anyhow::anyhow!("bundle sha256 computation failed: {e}"))?;
+        if b.bundle_sha256 != expected_hash {
+            bail!(
+                "bundle sha256 mismatch: recorded {}, computed {}",
+                b.bundle_sha256,
+                expected_hash
+            );
+        }
+        return Ok(b);
+    }
+    bail!(
+        "missing bundle at {} or {}; run `sker compile`",
+        rkyv_path.display(),
+        json_path.display()
+    )
 }
 pub fn atomic_json(path: &Path, value: &impl serde::Serialize) -> Result<()> {
     let parent = path.parent().unwrap_or(Path::new("."));

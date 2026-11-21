@@ -63,3 +63,51 @@ fn semantic_cross_service_rule_has_go_python_typescript_and_yaml_signals() {
     assert_eq!(present["signal_expected"].as_bool(), Some(true));
     assert_eq!(absent["signal_expected"].as_bool(), Some(false));
 }
+
+#[test]
+fn playbook_has_deterministic_python_eval_detector_and_polarity_fixtures() {
+    let entry: RuleEntry = serde_yaml_ng::from_str(include_str!(
+        "../../../examples/sample-playbook/rules/py-no-eval.yaml"
+    ))
+    .unwrap();
+    entry.validate().unwrap();
+    assert_eq!(entry.track, RuleTrack::Deterministic);
+    let detector: Value = serde_yaml_ng::from_str(include_str!(
+        "../../../examples/sample-playbook/rules/py-no-eval.yml"
+    ))
+    .unwrap();
+    assert_eq!(detector["language"].as_str(), Some("Python"));
+    assert_eq!(detector["rule"]["pattern"].as_str(), Some("eval($$$ARGS)"));
+    assert!(
+        include_str!("../../../examples/sample-playbook/fixtures/py-no-eval/positive/eval.py")
+            .contains("eval(x)")
+    );
+    assert!(
+        include_str!("../../../examples/sample-playbook/fixtures/py-no-eval/negative/safe.py")
+            .contains("int(x)")
+    );
+}
+
+#[test]
+fn playbook_has_deterministic_typescript_debugger_detector_and_polarity_fixtures() {
+    let entry: RuleEntry = serde_yaml_ng::from_str(include_str!(
+        "../../../examples/sample-playbook/rules/ts-no-debugger.yaml"
+    ))
+    .unwrap();
+    entry.validate().unwrap();
+    assert_eq!(entry.track, RuleTrack::Deterministic);
+    let detector: Value = serde_yaml_ng::from_str(include_str!(
+        "../../../examples/sample-playbook/rules/ts-no-debugger.yml"
+    ))
+    .unwrap();
+    assert_eq!(detector["language"].as_str(), Some("TypeScript"));
+    assert_eq!(detector["rule"]["pattern"].as_str(), Some("debugger"));
+    assert!(
+        include_str!("../../../examples/sample-playbook/fixtures/ts-no-debugger/positive/debug.ts")
+            .contains("debugger;")
+    );
+    assert!(
+        include_str!("../../../examples/sample-playbook/fixtures/ts-no-debugger/negative/safe.ts")
+            .contains("const x = 1;")
+    );
+}

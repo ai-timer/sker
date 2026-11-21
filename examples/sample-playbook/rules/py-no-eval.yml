@@ -1,0 +1,6 @@
+id: py.no-eval
+language: Python
+rule:
+  pattern: eval($$$ARGS)
+message: Do not use eval() to execute dynamic code in Python.
+severity: error

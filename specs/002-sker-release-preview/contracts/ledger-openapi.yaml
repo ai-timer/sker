@@ -207,7 +207,7 @@ components:
           format: date-time
         event_type:
           type: string
-          enum: [consult, search, check, attest, proposal, ci_gate, replay]
+          enum: [consult, search, check, attest, proposal, ci_gate, replay, compile]
         rule_id:
           type: string
           minLength: 1
@@ -250,7 +250,7 @@ components:
               enum: [go, python, typescript, yaml, infra, mixed, unknown]
             outcome:
               type: string
-              enum: [pass, block, warn, no_data]
+              enum: [pass, block, warn, no_data, mismatch, escalate]
     EventBatchReceipt:
       type: object
       additionalProperties: false

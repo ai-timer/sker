@@ -1,4 +1,4 @@
-use super::{bundle, find_repo, load_baseline, now};
+use super::{find_repo, load_baseline, now};
 use anyhow::{Context, Result, bail};
 use sker_schema::{AnalysisRequest, CheckStatus, DiffAnalyzer, FindingDisposition};
 use std::{
@@ -8,6 +8,7 @@ use std::{
 };
 pub fn run(
     path: &Path,
+    bundle_override: Option<&Path>,
     ci: bool,
     sarif: Option<&Path>,
     json_path: Option<&Path>,
@@ -15,7 +16,11 @@ pub fn run(
     credential: Option<&Path>,
 ) -> Result<()> {
     let repo = find_repo(path)?;
-    let b = bundle(&repo)?;
+    if repo.join(".sker.yaml").exists() {
+        let _ = sker_compiler::load_federated_sources(&repo, false)
+            .map_err(|e| anyhow::anyhow!("Federated rules lock verification failed: {e}"))?;
+    }
+    let b = super::support::bundle_with_override(&repo, bundle_override)?;
     let base = base
         .map(str::to_owned)
         .or_else(|| std::env::var("GITHUB_BASE_SHA").ok())
@@ -50,17 +55,35 @@ pub fn run(
             })
             .map(|f| f.rule_id.clone())
             .collect();
-        sker_analyzer::verify_credential(
+        let verify_res = sker_analyzer::verify_credential_with_context(
             &c,
             &report.bundle_sha256,
             &report.diff_tree_hash,
             &required,
-        )
-        .map_err(|e| anyhow::anyhow!("Agent credential or semantic declaration invalid: {e:?}"))?;
+            Some(&request.diff),
+            Some(&b),
+        );
+        match verify_res {
+            Ok(()) => {}
+            Err(sker_analyzer::CredentialError::RequiresEscalation(rule_ids)) => {
+                if ci {
+                    eprintln!(
+                        "sker check: CI gate blocked due to pending human escalation on rule(s): {}",
+                        rule_ids.join(", ")
+                    );
+                    std::process::exit(1);
+                }
+            }
+            Err(e) => {
+                bail!("Agent credential or semantic declaration invalid: {e:?}");
+            }
+        }
     }
     if ci {
-        let sp = sarif.context("--ci requires --sarif <path>")?;
-        let jp = json_path.context("--ci requires --json <path>")?;
+        let default_sarif = repo.join(".sker/report.sarif");
+        let default_json = repo.join(".sker/report.json");
+        let sp = sarif.unwrap_or(&default_sarif);
+        let jp = json_path.unwrap_or(&default_json);
         write_pair(sp, &sker_analyzer::sarif_document(&report), jp, &report)?;
     } else {
         println!(

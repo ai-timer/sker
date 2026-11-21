@@ -52,6 +52,7 @@ if (c.schema_version !== 'sker.agent-credential/v1' || c.diff_tree_hash !== diff
 const byRule = new Map();
 for (const v of c.semantic_verdicts) {
   if (!v.rule_id || !states.has(v.state) || typeof v.declaration !== 'string' || !v.declaration.trim()) process.exit(1);
+  if (v.state === 'escalate') process.exit(1);
   byRule.set(v.rule_id, v);
 }
 for (const f of report.findings) if (f.track === 'semantic' && f.disposition === 'pending_semantic' && !byRule.has(f.rule_id)) process.exit(1);
@@ -62,6 +63,8 @@ const c = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 delete c.credential_blake3;
 for (const v of c.semantic_verdicts || []) {
   if (v && v.rationale_digest === null) delete v.rationale_digest;
+  if (v && v.evidence_path === null) delete v.evidence_path;
+  if (v && v.evidence_line === null) delete v.evidence_line;
 }
 function canon(v) {
   if (Array.isArray(v)) return `[${v.map(canon).join(',')}]`;

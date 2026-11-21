@@ -1,0 +1,144 @@
+{
+  "schema_version": "sker.bundle/v1",
+  "bundle_id": "6caf3f1bbfca7d9a0ef515bffbb2d4faedc50554624b197c7689867d023c85cd",
+  "bundle_sha256": "6caf3f1bbfca7d9a0ef515bffbb2d4faedc50554624b197c7689867d023c85cd",
+  "sources": [
+    {
+      "kind": "repository_local",
+      "source_id": "repository",
+      "version": "working-tree",
+      "content_hash": "96932ebfaf3238dc3751c3716e58128952a7cb60780f0a9664f12eb65ef1ec69"
+    }
+  ],
+  "rules": [
+    {
+      "schema_version": "sker.entry/v1",
+      "rule_id": "architecture.shared-schema-boundary",
+      "version": "1.0.0",
+      "title": "Crates communicate through shared schema without ad hoc private cross-crate data types",
+      "domain": "architecture.schema-boundaries",
+      "description": "All workspace crates must exchange data through types defined by sker-schema. Changes to shared contracts must be represented in sker-schema.",
+      "severity": "WARN",
+      "track": "semantic",
+      "scope": {
+        "include_paths": [
+          "crates/**/*.rs",
+          "apps/**/*.rs"
+        ],
+        "exclude_paths": []
+      },
+      "signals": [
+        {
+          "signal_id": "private-cross-crate-contract",
+          "languages": [
+            "rust"
+          ],
+          "description": "Public data structure declaration in internal crate",
+          "pattern": "pub struct $NAME { $$$FIELDS }"
+        }
+      ],
+      "exemptions": [],
+      "overrides": [],
+      "fixtures": [],
+      "compliant_alternatives": [
+        "Expose shared data models and traits in sker-schema"
+      ],
+      "lifecycle": {
+        "kind": "ordinary",
+        "cooldown_hours": 24
+      },
+      "consult": {
+        "synonyms": [
+          "shared schema",
+          "cross-crate contract",
+          "sker-schema boundary"
+        ],
+        "keywords": [
+          "schema",
+          "boundary",
+          "crate"
+        ]
+      },
+      "tags": [
+        "rust",
+        "semantic",
+        "architecture"
+      ]
+    },
+    {
+      "schema_version": "sker.entry/v1",
+      "rule_id": "rust.no-c-dependencies",
+      "version": "1.0.0",
+      "title": "Avoid C-linked dependencies and extern \"C\"",
+      "domain": "architecture.rust-constraints",
+      "description": "Enforce Constitution Rust Constraints: No git2, openssl-sys, or extern 'C'. Use gix and rustls.",
+      "severity": "BLOCK",
+      "track": "deterministic",
+      "scope": {
+        "include_paths": [
+          "crates/**/*.rs",
+          "apps/**/*.rs",
+          "Cargo.toml"
+        ],
+        "exclude_paths": []
+      },
+      "signals": [
+        {
+          "signal_id": "extern-c-forbidden",
+          "languages": [
+            "rust"
+          ],
+          "description": "Disallow extern \"C\" declarations",
+          "pattern": "extern \"C\" { $$$DECLS }"
+        }
+      ],
+      "exemptions": [],
+      "overrides": [],
+      "fixtures": [
+        {
+          "fixture_id": "extern-c",
+          "polarity": "positive",
+          "path": ".sker/fixtures/workspace-boundaries/positive.rs",
+          "expected": "trigger"
+        },
+        {
+          "fixture_id": "pure-rust",
+          "polarity": "negative",
+          "path": ".sker/fixtures/workspace-boundaries/negative.rs",
+          "expected": "no_trigger"
+        }
+      ],
+      "compliant_alternatives": [
+        "Use gix for git operations and rustls for TLS",
+        "Use pure-Rust crates without C dependencies or extern 'C'"
+      ],
+      "lifecycle": {
+        "kind": "ordinary",
+        "cooldown_hours": 24
+      },
+      "consult": {
+        "synonyms": [
+          "extern C",
+          "c dependencies",
+          "openssl-sys",
+          "libgit2"
+        ],
+        "keywords": [
+          "rust",
+          "c-link",
+          "security",
+          "pure-rust"
+        ]
+      },
+      "tags": [
+        "rust",
+        "deterministic",
+        "constitution"
+      ]
+    }
+  ],
+  "metadata": {
+    "created_at": "1970-01-01T00:00:00Z",
+    "compiler_version": "0.1.0-preview"
+  }
+}

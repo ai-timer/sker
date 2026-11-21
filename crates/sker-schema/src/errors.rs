@@ -2,7 +2,9 @@ use thiserror::Error;
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum CompileError {
-    #[error("source {source_id} is unavailable")]
+    #[error(
+        "source {source_id} is unavailable (path not found; if referencing an external or central playbook, ensure the directory exists or run `git submodule update --init --recursive` / 路径未找到或未克隆，若引用外部规则源请检查路径或执行 git submodule update)"
+    )]
     SourceUnavailable { source_id: String },
     #[error("source lock mismatch for {source_id}")]
     LockMismatch { source_id: String },

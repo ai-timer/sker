@@ -1,4 +1,4 @@
-FROM rust:1.89-bookworm AS build
+FROM rust:bookworm AS build
 WORKDIR /workspace
 COPY . .
 RUN cargo build --release -p sker-ledger

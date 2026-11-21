@@ -162,13 +162,13 @@
           "type": "object",
           "additionalProperties": false,
           "required": ["kind", "cooldown_hours"],
-          "properties": {"kind": {"const": "ordinary"}, "cooldown_hours": {"const": 24}}
+          "properties": {"kind": {"const": "ordinary"}, "cooldown_hours": {"const": 24}, "reviewBy": {"type": "string"}}
         },
         {
           "type": "object",
           "additionalProperties": false,
           "required": ["kind", "hotfix_expires_at"],
-          "properties": {"kind": {"const": "incident_hotfix"}, "hotfix_expires_at": {"type": "string", "format": "date-time"}}
+          "properties": {"kind": {"const": "incident_hotfix"}, "hotfix_expires_at": {"type": "string", "format": "date-time"}, "reviewBy": {"type": "string"}}
         }
       ]
     },

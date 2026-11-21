@@ -37,7 +37,7 @@ pub use ledger::{
     AgeBucket, AgeDistributionBucket, EventCounters, EventLabels, EventLanguage, EventOutcome,
     GovernanceEvent, GovernanceEventType, HealthAction, HealthNotice, HealthStatus,
     MetricFreshness, MetricKey, MetricUnit, MetricValue, MetricWindow, RepositoryClass,
-    RuleLifecycle,
+    RuleLifecycle, RuleLifecycleSnapshot,
 };
 pub use rule::{
     ConsultMetadata, EntryFixture, EntryScope, Exemption, FixturePolarity, FixtureTrigger,

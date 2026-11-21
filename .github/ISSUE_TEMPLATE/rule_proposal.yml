@@ -1,0 +1,49 @@
+name: 新规约与负面知识提案 (Rule Proposal)
+description: 提议将新的团队架构负面知识、踩坑教训或编码禁忌纳入 Playbook
+title: "[Rule Proposal]: "
+labels: ["rule-proposal"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Sker 旨在沉淀团队的“负面知识”（What NOT to do）。请描述该规约的背景、理由及正反例。
+  - type: input
+    id: rule-id
+    attributes:
+      label: 建议规则 ID (Proposed Rule ID)
+      placeholder: "e.g. go-no-raw-goroutine, py-no-global-state"
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: 规则严重级别 (Severity)
+      options:
+        - "BLOCK (必须硬阻断，违规不可合并)"
+        - "WARN (警告提示，允许开发者知情确认)"
+        - "ADVISE (软性建议/指引)"
+    validations:
+      required: true
+  - type: textarea
+    id: rationale
+    attributes:
+      label: 规约设计理由与背景教训 (Rationale & Incident Background)
+      description: 为什么禁止这种写法？过去曾引发过什么故障或架构腐化？
+    validations:
+      required: true
+  - type: textarea
+    id: positive-fixture
+    attributes:
+      label: 正例代码 (Positive Example - 推荐写法)
+      description: 应当通过检查的推荐写法
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: negative-fixture
+    attributes:
+      label: 反例代码 (Negative Example - 违规写法)
+      description: 必须被该规则精准匹配并拦截的违规写法
+      render: text
+    validations:
+      required: true

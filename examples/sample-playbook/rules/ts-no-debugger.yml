@@ -1,0 +1,6 @@
+id: ts.no-debugger
+language: TypeScript
+rule:
+  pattern: debugger
+message: Do not leave debugger statements in TypeScript code.
+severity: error

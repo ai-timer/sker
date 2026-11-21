@@ -1,0 +1,4 @@
+id: ts-no-debugger
+language: TypeScript
+rule:
+  pattern: debugger

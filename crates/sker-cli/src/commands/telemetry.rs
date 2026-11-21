@@ -7,37 +7,85 @@ pub fn report_event_async(
     changed_lines: u64,
     outcome: &str,
 ) {
+    report_event_with_counters_async(
+        repo,
+        event_type,
+        bundle_sha256,
+        changed_lines,
+        None,
+        None,
+        outcome,
+    );
+}
+
+pub fn report_event_with_counters_async(
+    repo: &Path,
+    event_type: &str,
+    bundle_sha256: &str,
+    changed_lines: u64,
+    match_count: Option<u64>,
+    consult_count: Option<u64>,
+    outcome: &str,
+) {
     let endpoint = find_telemetry_endpoint(repo);
     let Some(endpoint) = endpoint else { return };
     if endpoint.trim().is_empty() {
         return;
     }
+    let token = find_telemetry_token(repo);
 
     let occurred_at = super::now();
     let event_id = generate_uuid();
     let bundle_sha256 = bundle_sha256.to_string();
     let event_type = event_type.to_string();
     let outcome = outcome.to_string();
+    let repo_buf = repo.to_path_buf();
 
     std::thread::spawn(move || {
         let agent = ureq::Agent::config_builder()
-            .timeout_global(Some(std::time::Duration::from_millis(1000)))
+            .timeout_global(Some(std::time::Duration::from_millis(1500)))
             .build()
             .new_agent();
+
+        let mut lifecycles = Vec::new();
+        if let Ok(b) = super::bundle(&repo_buf) {
+            for r in b.rules {
+                lifecycles.push(serde_json::json!({
+                    "rule_id": r.rule_id,
+                    "kind": r.lifecycle.kind,
+                    "cooldown_hours": r.lifecycle.cooldown_hours,
+                    "hotfix_expires_at": r.lifecycle.hotfix_expires_at,
+                    "review_by": r.lifecycle.review_by,
+                }));
+            }
+        }
+
+        let mut counters = serde_json::Map::new();
+        if changed_lines > 0 || event_type == "check" || event_type == "ci_gate" {
+            counters.insert(
+                "changed_line_count".into(),
+                serde_json::json!(changed_lines),
+            );
+        }
+        if let Some(m) = match_count {
+            counters.insert("match_count".into(), serde_json::json!(m));
+        }
+        if let Some(c) = consult_count {
+            counters.insert("consult_count".into(), serde_json::json!(c));
+        }
 
         let event = serde_json::json!({
             "event_id": event_id,
             "occurred_at": occurred_at,
             "event_type": event_type,
             "bundle_sha256": bundle_sha256,
-            "counters": {
-                "changed_line_count": changed_lines
-            },
+            "counters": counters,
             "labels": {
                 "repository_class": "unknown",
                 "language": "unknown",
                 "outcome": outcome
-            }
+            },
+            "lifecycles": lifecycles,
         });
 
         let batch = serde_json::json!({
@@ -52,8 +100,47 @@ pub fn report_event_async(
         };
 
         // Fail-open: ignore any network/service failure, timeout, or error response
-        let _ = agent.post(&target_url).send_json(&batch);
+        let mut req = agent.post(&target_url);
+        if let Some(ref t) = token {
+            req = req.header("Authorization", &format!("Bearer {}", t.trim()));
+        }
+        let _ = req.send_json(&batch);
     });
+}
+
+fn find_telemetry_token(repo: &Path) -> Option<String> {
+    if let Ok(token) = std::env::var("LEDGER_BEARER_TOKEN")
+        && !token.trim().is_empty()
+    {
+        return Some(token);
+    }
+    if let Ok(token) = std::env::var("SKER_LEDGER_TOKEN")
+        && !token.trim().is_empty()
+    {
+        return Some(token);
+    }
+    for file in [".sker.yaml", "sker.yaml", ".sker/config.yaml"] {
+        let path = repo.join(file);
+        if let Ok(content) = fs::read(&path)
+            && let Ok(val) = serde_yaml_ng::from_slice::<serde_yaml_ng::Value>(&content)
+        {
+            if let Some(t) = val
+                .get("telemetry")
+                .and_then(|t| t.get("token"))
+                .and_then(|e| e.as_str())
+            {
+                return Some(t.to_string());
+            }
+            if let Some(t) = val
+                .get("ledger")
+                .and_then(|t| t.get("token"))
+                .and_then(|e| e.as_str())
+            {
+                return Some(t.to_string());
+            }
+        }
+    }
+    None
 }
 
 fn find_telemetry_endpoint(repo: &Path) -> Option<String> {

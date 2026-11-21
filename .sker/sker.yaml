@@ -1,0 +1,6 @@
+schema_version: sker.playbook/v1
+playbook_id: sker-dogfooding
+description: Sker architecture red lines and governance boundaries
+rules:
+  - rules/workspace-boundaries.yaml
+  - rules/shared-schema-boundary.yaml
