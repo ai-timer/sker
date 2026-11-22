@@ -1,4 +1,4 @@
-use sker_schema::RuleBundle;
+use sker_schema::{AgentConfig, RuleBundle};
 use std::{collections::BTreeMap, fs, path::Path};
 const START: &str = "<!-- sker:managed:start -->";
 const END: &str = "<!-- sker:managed:end -->";
@@ -13,6 +13,8 @@ fn managed_block(bundle: &RuleBundle) -> String {
         START.to_string(),
         "1. Read the matched rule and its scope.".to_string(),
         "2. Apply the rule, then run its positive and negative fixtures.".to_string(),
+        "Before changing code: run `sker consult` for the relevant paths.".to_string(),
+        "After changes: run `sker check` and resolve deterministic BLOCK findings.".to_string(),
     ];
     for rule in bundle
         .rules
@@ -81,38 +83,42 @@ pub fn project_guidance(
     })
 }
 
-/// Writes the generated guidance and per-domain skills below a repository root.
+/// Writes the generated guidance for each enabled integration below a repository root.
+///
+/// `AGENTS.md` is always projected; every additional enabled agent contributes its
+/// declared `rules_file`. Managed blocks are replaced idempotently.
 pub fn write_projections(
     bundle: &RuleBundle,
     root: impl AsRef<Path>,
+    agents: &[AgentConfig],
 ) -> Result<Projection, std::io::Error> {
     let root = root.as_ref();
     let projection = project_guidance(bundle, root)?;
-    fs::write(root.join("AGENTS.md"), &projection.agents_md)?;
-    fs::write(root.join("CLAUDE.md"), &projection.claude_md)?;
-
-    // Synchronize Antigravity rule projections idempotently
     let block = managed_block(bundle);
-    let mut wrote_agent_rule = false;
-    for rel in [".agent/rules/sker.md", ".agents/rules/sker.md"] {
-        let p = root.join(rel);
-        if p.exists() || p.parent().is_some_and(|parent| parent.exists()) {
-            if let Some(parent) = p.parent() {
-                fs::create_dir_all(parent)?;
-            }
-            let prior = fs::read_to_string(&p).unwrap_or_default();
-            let updated = replace_managed(&prior, &block);
-            fs::write(p, updated)?;
-            wrote_agent_rule = true;
+
+    let mut targets: Vec<String> = vec!["AGENTS.md".into()];
+    for agent in agents {
+        let rules_file = agent.rules_file();
+        if !targets.iter().any(|t| t == &rules_file) {
+            targets.push(rules_file);
         }
     }
-    if !wrote_agent_rule {
-        let default_rule = root.join(".agent/rules/sker.md");
-        if let Some(parent) = default_rule.parent() {
+
+    let mut agents_md = String::new();
+    let mut claude_md = fs::read_to_string(root.join("CLAUDE.md")).unwrap_or_default();
+    for rel in &targets {
+        let path = root.join(rel);
+        if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
-        let updated = replace_managed("", &block);
-        fs::write(default_rule, updated)?;
+        let prior = fs::read_to_string(&path).unwrap_or_default();
+        let updated = replace_managed(&prior, &block);
+        fs::write(&path, &updated)?;
+        if rel == "AGENTS.md" {
+            agents_md = updated;
+        } else if rel == "CLAUDE.md" {
+            claude_md = updated;
+        }
     }
 
     // Exact delta cleanup: only clean up obsolete `sker-*` skill directories
@@ -148,7 +154,11 @@ pub fn write_projections(
         }
         fs::write(path, content)?;
     }
-    Ok(projection)
+    Ok(Projection {
+        agents_md,
+        claude_md,
+        skills: projection.skills,
+    })
 }
 
 #[cfg(test)]
@@ -231,7 +241,11 @@ mod tests {
         .unwrap();
 
         let bundle = make_test_bundle(&["active-domain"]);
-        write_projections(&bundle, &temp).unwrap();
+        let agents = [
+            AgentConfig::Preset("universal".into()),
+            AgentConfig::Preset("antigravity".into()),
+        ];
+        write_projections(&bundle, &temp, &agents).unwrap();
 
         assert!(
             skills_dir.join("speckit-custom/SKILL.md").exists(),

@@ -34,16 +34,16 @@ fn clap_exposes_expected_command_tree() {
 
     // Verify slim command help structure
     for cmd in [
-        "compile", "check", "consult", "search", "attest", "propose", "replay", "init", "doctor",
-        "baseline", "mcp", "hook",
+        "compile", "check", "consult", "search", "attest", "propose", "replay", "init", "agent",
+        "doctor", "baseline", "mcp", "hook",
     ] {
         assert!(help.contains(cmd), "help missing subcommand {cmd}");
     }
 
     // 3. Verify all subcommands exist and have non-empty about descriptions
     let subcommands = [
-        "compile", "check", "consult", "search", "attest", "propose", "replay", "init", "doctor",
-        "baseline", "mcp", "hook",
+        "compile", "check", "consult", "search", "attest", "propose", "replay", "init", "agent",
+        "doctor", "baseline", "mcp", "hook",
     ];
     for command in subcommands {
         assert!(
@@ -81,6 +81,15 @@ fn clap_exposes_expected_command_tree() {
             .find_subcommand(sub)
             .unwrap_or_else(|| panic!("missing baseline subcommand {sub}"));
         assert!(b_sub.get_about().is_some(), "baseline {sub} missing about");
+    }
+
+    // 5. Verify agent nested subcommands have non-empty about
+    let agent_cmd = app.find_subcommand("agent").expect("missing agent command");
+    for sub in ["list", "add", "remove", "mcp-config"] {
+        let a_sub = agent_cmd
+            .find_subcommand(sub)
+            .unwrap_or_else(|| panic!("missing agent subcommand {sub}"));
+        assert!(a_sub.get_about().is_some(), "agent {sub} missing about");
     }
 }
 #[test]
@@ -171,7 +180,7 @@ fn init_and_doctor_support_antigravity_host() {
 }
 
 #[test]
-fn init_detects_and_updates_antigravity_home_mcp_config() {
+fn init_hints_for_home_only_antigravity_without_polluting_repo() {
     let p = root();
     let home = root();
     let ag_dir = home.join(".gemini/antigravity");
@@ -191,15 +200,141 @@ fn init_detects_and_updates_antigravity_home_mcp_config() {
         String::from_utf8_lossy(&out.stderr)
     );
     let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(stdout.contains("antigravity"));
+    assert!(
+        stdout.contains("hint") && stdout.contains("antigravity"),
+        "expected a friendly antigravity hint: {stdout}"
+    );
 
-    let updated_cfg: serde_json::Value =
+    // Home-only detection must NOT write host config or repo-specific files.
+    let unchanged_cfg: serde_json::Value =
         serde_json::from_slice(&fs::read(&mcp_cfg).unwrap()).unwrap();
-    assert_eq!(updated_cfg["mcpServers"]["sker"]["command"], "sker");
-    assert_eq!(updated_cfg["mcpServers"]["sker"]["args"][0], "mcp");
+    assert!(
+        unchanged_cfg["mcpServers"].as_object().unwrap().is_empty(),
+        "home MCP config must stay untouched until explicitly enabled"
+    );
+    assert!(
+        !p.join(".agent/rules/sker.md").exists(),
+        "no antigravity rules may be projected without repo enablement"
+    );
+    let cfg: serde_yaml_ng::Value =
+        serde_yaml_ng::from_slice(&fs::read(p.join(".sker.yaml")).unwrap()).unwrap();
+    let agents = cfg["agents"].as_sequence().unwrap();
+    assert_eq!(agents.len(), 1);
+    assert_eq!(agents[0].as_str().unwrap(), "universal");
 
     let _ = fs::remove_dir_all(p);
     let _ = fs::remove_dir_all(home);
+}
+
+#[test]
+fn agent_add_list_remove_and_custom_declaration_lifecycle() {
+    let p = root();
+    let init = Command::new(env!("CARGO_BIN_EXE_sker"))
+        .args(["init", "--repo"])
+        .arg(&p)
+        .output()
+        .unwrap();
+    assert!(init.status.success());
+
+    // Preset add: codebuddy writes .codebuddy/rules/sker.md + .codebuddy/mcp.json
+    let add = Command::new(env!("CARGO_BIN_EXE_sker"))
+        .args(["agent", "--repo"])
+        .arg(&p)
+        .args(["add", "codebuddy"])
+        .output()
+        .unwrap();
+    assert!(
+        add.status.success(),
+        "{}",
+        String::from_utf8_lossy(&add.stderr)
+    );
+    let rules = fs::read_to_string(p.join(".codebuddy/rules/sker.md")).unwrap();
+    assert_eq!(rules.matches("sker:managed:start").count(), 1);
+    let mcp: serde_json::Value =
+        serde_json::from_slice(&fs::read(p.join(".codebuddy/mcp.json")).unwrap()).unwrap();
+    assert_eq!(mcp["mcpServers"]["sker"]["command"], "sker");
+
+    // Idempotent re-add keeps a single managed block and config entry
+    let add2 = Command::new(env!("CARGO_BIN_EXE_sker"))
+        .args(["agent", "--repo"])
+        .arg(&p)
+        .args(["add", "codebuddy"])
+        .output()
+        .unwrap();
+    assert!(add2.status.success());
+    let rules = fs::read_to_string(p.join(".codebuddy/rules/sker.md")).unwrap();
+    assert_eq!(rules.matches("sker:managed:start").count(), 1);
+
+    // Custom declaration
+    let custom = Command::new(env!("CARGO_BIN_EXE_sker"))
+        .args(["agent", "--repo"])
+        .arg(&p)
+        .args([
+            "add",
+            "custom",
+            "--name",
+            "inhouse",
+            "--rules-file",
+            ".inhouse/rules.md",
+            "--mcp-file",
+            ".inhouse/mcp.json",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        custom.status.success(),
+        "{}",
+        String::from_utf8_lossy(&custom.stderr)
+    );
+    assert!(p.join(".inhouse/rules.md").exists());
+    assert!(p.join(".inhouse/mcp.json").exists());
+
+    // list shows enabled presets and the custom entry
+    let list = Command::new(env!("CARGO_BIN_EXE_sker"))
+        .args(["agent", "--repo"])
+        .arg(&p)
+        .arg("list")
+        .output()
+        .unwrap();
+    assert!(list.status.success());
+    let listing = String::from_utf8_lossy(&list.stdout);
+    assert!(listing.contains("codebuddy") && listing.contains("[enabled]"));
+    assert!(listing.contains("inhouse"));
+
+    // Existing rules and baseline artifacts are untouched by registration
+    assert!(p.join(".sker/rules").is_dir());
+
+    // remove drops the entry from .sker.yaml
+    let remove = Command::new(env!("CARGO_BIN_EXE_sker"))
+        .args(["agent", "--repo"])
+        .arg(&p)
+        .args(["remove", "codebuddy"])
+        .output()
+        .unwrap();
+    assert!(remove.status.success());
+    let cfg: serde_yaml_ng::Value =
+        serde_yaml_ng::from_slice(&fs::read(p.join(".sker.yaml")).unwrap()).unwrap();
+    let names: Vec<&str> = cfg["agents"]
+        .as_sequence()
+        .unwrap()
+        .iter()
+        .filter_map(|v| v.as_str())
+        .collect();
+    assert!(!names.contains(&"codebuddy"));
+    assert!(names.contains(&"universal"));
+
+    // mcp-config prints a copy-pasteable 5-line snippet
+    let snippet = Command::new(env!("CARGO_BIN_EXE_sker"))
+        .args(["agent", "mcp-config"])
+        .output()
+        .unwrap();
+    assert!(snippet.status.success());
+    let text = String::from_utf8(snippet.stdout).unwrap();
+    assert_eq!(text.trim().lines().count(), 5);
+    let parsed: serde_json::Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(parsed["mcpServers"]["sker"]["args"][0], "mcp");
+
+    let _ = fs::remove_dir_all(p);
 }
 #[test]
 fn baseline_list_is_empty_for_clean_repository() {
@@ -221,6 +356,202 @@ fn baseline_list_is_empty_for_clean_repository() {
 }
 
 #[test]
+fn init_doctor_check_all_exit_zero_in_fresh_repository() {
+    let p = root();
+    let git_init = Command::new("git")
+        .args(["init", "-q"])
+        .current_dir(&p)
+        .output()
+        .unwrap();
+    assert!(
+        git_init.status.success(),
+        "{}",
+        String::from_utf8_lossy(&git_init.stderr)
+    );
+
+    let run = |cmd: &str| {
+        let out = Command::new(env!("CARGO_BIN_EXE_sker"))
+            .args([cmd, "--repo"])
+            .arg(&p)
+            .output()
+            .unwrap();
+        assert_eq!(
+            out.status.code(),
+            Some(0),
+            "`sker {cmd}` failed:\nstdout={}\nstderr={}",
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8_lossy(&out.stdout).into_owned()
+    };
+    run("init");
+    let doctor_stdout = run("doctor");
+    assert!(
+        doctor_stdout.contains("SKIP optional universal MCP"),
+        "doctor must SKIP the absent optional universal MCP: {doctor_stdout}"
+    );
+    assert!(
+        !doctor_stdout.contains("FAIL"),
+        "doctor reported FAIL in a freshly initialized repo: {doctor_stdout}"
+    );
+    run("check");
+    let _ = fs::remove_dir_all(p);
+}
+
+const BIN_SCOPE_RULE: &str = r#"schema_version: sker.entry/v1
+rule_id: regression.bin.no-eval
+version: 1.0.0
+title: Binary artifacts must not embed eval payloads
+domain: security
+description: Scoped deterministic rule covering binary artifacts.
+severity: BLOCK
+track: deterministic
+scope:
+  include_paths: ["**/*.bin"]
+signals:
+  - signal_id: bin-eval
+    languages: [python]
+    description: eval call
+    pattern: "eval($$$ARGS)"
+exemptions: []
+overrides: []
+fixtures:
+  - fixture_id: eval-call
+    polarity: positive
+    path: examples/sample-playbook/fixtures/py-no-eval/positive/eval.py
+    expected: trigger
+  - fixture_id: safe-int-call
+    polarity: negative
+    path: examples/sample-playbook/fixtures/py-no-eval/negative/safe.py
+    expected: no_trigger
+compliant_alternatives: ["ast.literal_eval(...)"]
+lifecycle:
+  kind: ordinary
+  cooldown_hours: 24
+consult:
+  synonyms: []
+  keywords: []
+tags: [binary]
+"#;
+
+#[test]
+fn init_without_agent_flag_keeps_minimal_set_even_with_populated_home() {
+    let p = root();
+    let home = root();
+    fs::create_dir_all(home.join(".claude")).unwrap();
+    fs::create_dir_all(home.join(".codex")).unwrap();
+    fs::create_dir_all(home.join(".gemini/antigravity")).unwrap();
+
+    let git = |args: &[&str]| {
+        let out = Command::new("git")
+            .args(args)
+            .current_dir(&p)
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    };
+    git(&["init", "-q"]);
+
+    let out = Command::new(env!("CARGO_BIN_EXE_sker"))
+        .args(["init", "--repo"])
+        .arg(&p)
+        .env("HOME", &home)
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    for hint in ["hint: Claude", "hint: Codex", "hint: Antigravity"] {
+        assert!(stdout.contains(hint), "missing {hint} in stdout: {stdout}");
+    }
+
+    // Exactly the minimal artifact set may exist at the repo root.
+    let mut entries: Vec<String> = fs::read_dir(&p)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    entries.sort();
+    assert_eq!(
+        entries,
+        [".git", ".gitignore", ".sker", ".sker.yaml", "AGENTS.md"],
+        "unexpected root artifacts: {entries:?}"
+    );
+
+    // Inside .sker only the rules directory and rebuildable bundle artifacts.
+    let mut sker_entries: Vec<String> = fs::read_dir(p.join(".sker"))
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    sker_entries.sort();
+    assert_eq!(
+        sker_entries,
+        ["bundle.json", "bundle.rkyv", "bundle.sha256", "rules"],
+        "unexpected .sker artifacts: {sker_entries:?}"
+    );
+    assert!(p.join(".sker/rules").is_dir());
+
+    // No host integration may be injected from $HOME detection.
+    for forbidden in [
+        ".claude",
+        ".codex",
+        "CLAUDE.md",
+        ".mcp.json",
+        ".agents",
+        ".agent",
+        ".cursor",
+        ".cursorrules",
+        ".codebuddy",
+        ".windsurf",
+        ".codeium",
+        ".opencode",
+        "opencode.json",
+    ] {
+        assert!(
+            !p.join(forbidden).exists(),
+            "forbidden host artifact generated: {forbidden}"
+        );
+    }
+
+    let cfg: serde_yaml_ng::Value =
+        serde_yaml_ng::from_slice(&fs::read(p.join(".sker.yaml")).unwrap()).unwrap();
+    let agents = cfg["agents"].as_sequence().unwrap();
+    assert_eq!(agents.len(), 1);
+    assert_eq!(agents[0].as_str().unwrap(), "universal");
+
+    // Unified ignore list; credential.json must stay committable for CI.
+    let ignore = fs::read_to_string(p.join(".gitignore")).unwrap();
+    assert!(
+        !ignore.contains("credential"),
+        "credential.json must never be gitignored"
+    );
+    for entry in [
+        ".sker/bundle.*",
+        ".sker/cache/",
+        ".sker/tmp/",
+        ".sker/check.json",
+        ".sker/report.json",
+        "*.sarif",
+        "sker-report.json",
+        "sker-check-report.json",
+    ] {
+        assert!(
+            ignore.lines().any(|l| l.trim() == entry),
+            "gitignore missing {entry}"
+        );
+    }
+
+    let _ = fs::remove_dir_all(p);
+    let _ = fs::remove_dir_all(home);
+}
+
+#[test]
 fn ci_check_writes_both_reports_and_returns_incomplete_exit_code() {
     let repo = root();
     fs::create_dir_all(repo.join(".sker/rules")).unwrap();
@@ -228,6 +559,9 @@ fn ci_check_writes_both_reports_and_returns_incomplete_exit_code() {
     let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../examples/sample-playbook/rules/go-no-logging.yaml");
     fs::copy(source, repo.join(".sker/rules/go-no-logging.yaml")).unwrap();
+    // Only rule-scoped unsupported files may trigger incomplete; give `.bin`
+    // an active deterministic rule scope.
+    fs::write(repo.join(".sker/rules/bin-scope.yaml"), BIN_SCOPE_RULE).unwrap();
     let file = repo.join("services/payments/main.go");
     fs::write(&file, "package payments\nfunc f() {}\n").unwrap();
     let git = |args: &[&str]| {

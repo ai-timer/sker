@@ -4,7 +4,7 @@ use sker_retriever::IntentRetriever;
 use sker_schema::*;
 use std::{
     fs,
-    io::{self, Read},
+    io::{self, IsTerminal, Read},
     path::Path,
 };
 
@@ -71,8 +71,13 @@ pub fn search(path: &Path, bundle_override: Option<&Path>, query: &str) -> Resul
 pub fn attest(path: &Path, semantic: &str, output: Option<&Path>) -> Result<()> {
     let repo = find_repo(path)?;
     let b = bundle(&repo)?;
-    let base = std::env::var("GITHUB_BASE_SHA").unwrap_or_else(|_| "HEAD^".into());
-    let diff = sker_analyzer::extract_diff(repo.to_str().unwrap_or("."), &base, "HEAD")?;
+    let explicit_base = std::env::var("GITHUB_BASE_SHA").ok();
+    let diff_result = sker_analyzer::compute_diff(
+        repo.to_str().unwrap_or("."),
+        explicit_base.as_deref(),
+        false,
+    )?;
+    let diff = diff_result.entries;
     let hash = compute_diff_tree_hash(&diff);
     let semantic_verdicts: Vec<SemanticVerdict> = serde_json::from_str(semantic)
         .context("--semantic must be a JSON array of SemanticVerdict")?;
@@ -201,6 +206,11 @@ pub async fn mcp(repo: &Path) -> Result<()> {
 
 pub fn hook(repo: &Path, hard_block: bool) -> Result<()> {
     let repo_path = find_repo(repo)?;
+    if io::stdin().is_terminal() {
+        eprintln!(
+            "sker hook: waiting for PreToolUse JSON on stdin (normally invoked by AI agent hooks; pipe JSON or press Ctrl+D / Ctrl+C)"
+        );
+    }
     let mut input_str = String::new();
     let _ = io::stdin().read_to_string(&mut input_str);
     let input: sker_mcp::PreToolUseInput = if input_str.trim().is_empty() {

@@ -37,85 +37,47 @@ pub fn run(path: &Path) -> Result<()> {
         &mut failed,
     );
     let max = 300usize;
-    for file in [
-        "AGENTS.md",
-        "CLAUDE.md",
-        ".agent/rules/sker.md",
-        ".agents/rules/sker.md",
-    ] {
-        let p = repo.join(file);
-        if p.exists() {
-            let text = fs::read_to_string(&p)?;
-            let block = managed_block(&text);
-            let ok = block.is_some_and(|s| s.split_whitespace().count() <= max);
+    let agents = super::agent::get_configured_agents(&repo);
+    for agent in &agents {
+        let name = agent.name().to_lowercase();
+        let rules_rel = agent.rules_file();
+        let rules_res = rules_block_health(&repo, &rules_rel, max);
+        report(
+            &format!("{rules_rel} managed block <= {max} tokens"),
+            rules_res.clone(),
+            &mut failed,
+        );
+
+        let mcp_absent = agent.mcp_file().is_some_and(|rel| !repo.join(rel).exists());
+        if name == "universal" && mcp_absent {
+            // The default universal integration is AGENTS.md-only; an absent
+            // .mcp.json is optional, never a failure.
+            println!(
+                "SKIP optional universal MCP (.mcp.json not present; run 'sker agent add universal' if using an MCP client)"
+            );
+        } else if name == "antigravity" {
+            let mut mcp_res = mcp_health(&repo, agent);
+            if mcp_res.is_err() && antigravity_home_config().is_some_and(|p| mcp_json_has_sker(&p))
+            {
+                mcp_res = Ok(());
+            }
             report(
-                &format!("{file} managed block <= {max} tokens"),
-                if ok {
-                    Ok(())
-                } else {
-                    Err("managed block exceeds token limit or is malformed".into())
-                },
+                "Antigravity configuration",
+                rules_res.and(mcp_res),
+                &mut failed,
+            );
+        } else {
+            report(
+                &format!("{name} MCP configuration"),
+                mcp_health(&repo, agent),
                 &mut failed,
             );
         }
-    }
-    let settings = repo.join(".mcp.json");
-    let codex = repo.join(".codex/config.toml");
-    let antigravity_user_cfg = std::env::var_os("HOME")
-        .map(|h| std::path::PathBuf::from(h).join(".gemini/antigravity/mcp_config.json"));
-    let hook = repo.join(".claude/settings.json");
-    report(
-        "MCP configuration",
-        if settings.exists()
-            || codex.exists()
-            || antigravity_user_cfg.as_ref().is_some_and(|p| p.exists())
-        {
-            Ok(())
-        } else {
-            Err("no MCP host config; run `sker init` and register `sker mcp`".into())
-        },
-        &mut failed,
-    );
-    let antigravity_host = repo.join(".agent").exists()
-        || repo.join(".agents").exists()
-        || antigravity_user_cfg.as_ref().is_some_and(|p| p.exists());
-    if antigravity_host {
-        let rule_file_exists = repo.join(".agent/rules/sker.md").exists()
-            || repo.join(".agents/rules/sker.md").exists();
-        report(
-            "Antigravity configuration",
-            if settings.exists() || antigravity_user_cfg.as_ref().is_some_and(|p| p.exists()) {
-                if rule_file_exists {
-                    Ok(())
-                } else {
-                    Err(
-                        "Antigravity detected but .agent/rules/sker.md missing; run `sker init`"
-                            .into(),
-                    )
-                }
-            } else {
-                Err("Antigravity MCP configuration missing; run `sker init`".into())
-            },
-            &mut failed,
-        );
-    } else {
-        println!("SKIP Antigravity configuration: no Antigravity host detected");
-    }
-    if repo.join(".claude").exists()
-        || std::env::var_os("HOME")
-            .is_some_and(|h| std::path::PathBuf::from(h).join(".claude").exists())
-    {
-        report(
-            "Hook configuration",
-            if hook.exists() {
-                Ok(())
-            } else {
-                Err("no Claude Hook config; run `sker init` and configure PreToolUse".into())
-            },
-            &mut failed,
-        );
-    } else {
-        println!("SKIP Hook configuration: no Claude host detected")
+
+        if name == "claude" {
+            let hook_res = claude_hook_health(&repo);
+            report("Hook configuration", hook_res, &mut failed);
+        }
     }
     let endpoint_url = std::env::var("SKER_LEDGER_URL")
         .or_else(|_| std::env::var("SKER_TELEMETRY_ENDPOINT"))
@@ -169,6 +131,70 @@ fn report(label: &str, result: Result<(), String>, failed: &mut bool) {
             *failed = true;
             println!("FAIL {label}: {e}")
         }
+    }
+}
+fn rules_block_health(repo: &Path, rel: &str, max: usize) -> Result<(), String> {
+    let p = repo.join(rel);
+    let text = fs::read_to_string(&p)
+        .map_err(|_| format!("{rel} missing; run `sker init` or `sker compile`"))?;
+    match managed_block(&text) {
+        Some(s) if s.split_whitespace().count() <= max => Ok(()),
+        Some(_) => Err("managed block exceeds token limit".into()),
+        None => Err("managed block missing or malformed; run `sker compile`".into()),
+    }
+}
+fn mcp_health(repo: &Path, agent: &sker_schema::AgentConfig) -> Result<(), String> {
+    let Some(rel) = agent.mcp_file() else {
+        return Ok(());
+    };
+    let p = repo.join(&rel);
+    let repair = format!("run `sker agent add {}`", agent.name());
+    if rel.ends_with(".toml") {
+        let text = fs::read_to_string(&p).map_err(|_| format!("{rel} missing; {repair}"))?;
+        if text.contains("[mcp_servers.sker]") {
+            Ok(())
+        } else {
+            Err(format!("{rel} has no [mcp_servers.sker] entry; {repair}"))
+        }
+    } else if mcp_json_has_sker(&p) {
+        Ok(())
+    } else {
+        Err(format!(
+            "{rel} missing or has no sker mcpServers entry; {repair}"
+        ))
+    }
+}
+fn mcp_json_has_sker(p: &Path) -> bool {
+    fs::read(p)
+        .ok()
+        .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok())
+        .is_some_and(|v| v["mcpServers"]["sker"]["command"] == "sker")
+}
+fn antigravity_home_config() -> Option<std::path::PathBuf> {
+    std::env::var_os("HOME")
+        .map(|h| std::path::PathBuf::from(h).join(".gemini/antigravity/mcp_config.json"))
+        .filter(|p| p.exists())
+}
+fn claude_hook_health(repo: &Path) -> Result<(), String> {
+    let p = repo.join(".claude/settings.json");
+    let bytes = fs::read(&p).map_err(|_| "no Claude Hook config; run `sker agent add claude`")?;
+    let json: serde_json::Value = serde_json::from_slice(&bytes)
+        .map_err(|_| ".claude/settings.json is not valid JSON".to_string())?;
+    let has_sker_hook = json["hooks"]["PreToolUse"].as_array().is_some_and(|arr| {
+        arr.iter().any(|entry| {
+            entry["hooks"].as_array().is_some_and(|hs| {
+                hs.iter().any(|h| {
+                    h["command"]
+                        .as_str()
+                        .is_some_and(|c| c.contains("sker hook"))
+                })
+            })
+        })
+    });
+    if has_sker_hook {
+        Ok(())
+    } else {
+        Err("no PreToolUse `sker hook` entry; run `sker agent add claude`".into())
     }
 }
 fn managed_block(s: &str) -> Option<&str> {

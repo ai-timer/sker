@@ -163,9 +163,31 @@ pub enum Command {
     Init {
         #[arg(long, default_value = ".", help = "Path to target repository root")]
         repo: PathBuf,
+
+        #[arg(
+            long = "agent",
+            value_delimiter = ',',
+            help = "Agent integrations to enable (e.g. claude,codex,codebuddy)"
+        )]
+        agents: Vec<String>,
+
+        #[arg(
+            long = "git-hooks",
+            help = "Install a pre-commit hook running sker check"
+        )]
+        git_hooks: bool,
     },
 
-    #[command(about = "Diagnose git repository, rules, and host configuration")]
+    #[command(about = "Manage declarative agent integrations")]
+    Agent {
+        #[command(subcommand)]
+        operation: AgentCommand,
+
+        #[arg(long, default_value = ".", help = "Path to target repository root")]
+        repo: PathBuf,
+    },
+
+    #[command(about = "Diagnose git repository, rules, and agent configuration")]
     Doctor {
         #[arg(long, default_value = ".", help = "Path to target repository root")]
         repo: PathBuf,
@@ -212,4 +234,37 @@ pub enum BaselineCommand {
 
     #[command(about = "Prune resolved baseline items that no longer trigger violations")]
     Prune,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum AgentCommand {
+    #[command(about = "List built-in agent presets and enabled integrations")]
+    List,
+
+    #[command(about = "Enable a preset or custom agent integration")]
+    Add {
+        #[arg(help = "Preset name, or 'custom' for a declarative integration")]
+        name: String,
+
+        #[arg(long = "name", help = "Custom integration name (with 'custom')")]
+        custom_name: Option<String>,
+
+        #[arg(long = "rules-file", help = "Custom rules file path (with 'custom')")]
+        rules_file: Option<String>,
+
+        #[arg(
+            long = "mcp-file",
+            help = "Custom MCP config file path (with 'custom')"
+        )]
+        mcp_file: Option<String>,
+    },
+
+    #[command(about = "Disable an agent integration in .sker.yaml")]
+    Remove {
+        #[arg(help = "Agent integration name")]
+        name: String,
+    },
+
+    #[command(about = "Print a generic mcpServers JSON snippet for any MCP tool")]
+    McpConfig,
 }

@@ -1,3 +1,4 @@
+mod agent;
 mod baseline;
 mod check;
 mod compile;
@@ -71,7 +72,31 @@ pub async fn run(command: Command) -> Result<()> {
             repo,
         } => interaction::propose(&repo, &entry, &rationale),
         Command::Replay { from, to, repo } => interaction::replay(&repo, &from, &to),
-        Command::Init { repo } => init::run(&repo),
+        Command::Init {
+            repo,
+            agents,
+            git_hooks,
+        } => init::run(&repo, &agents, git_hooks),
+        Command::Agent { operation, repo } => match operation {
+            crate::AgentCommand::List => agent::list(&repo),
+            crate::AgentCommand::Add {
+                name,
+                custom_name,
+                rules_file,
+                mcp_file,
+            } => agent::add(
+                &repo,
+                &name,
+                custom_name.as_deref(),
+                rules_file.as_deref(),
+                mcp_file.as_deref(),
+            ),
+            crate::AgentCommand::Remove { name } => agent::remove(&repo, &name),
+            crate::AgentCommand::McpConfig => {
+                agent::mcp_config();
+                Ok(())
+            }
+        },
         Command::Doctor { repo } => doctor::run(&repo),
         Command::Baseline { operation, repo } => baseline::run(&repo, operation),
         Command::Mcp { repo } => interaction::mcp(&repo).await,

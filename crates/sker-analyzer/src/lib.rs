@@ -46,7 +46,7 @@ impl DiffAnalyzer for Analyzer {
 }
 
 pub use credential_verify::{CredentialError, verify_credential, verify_credential_with_context};
-pub use diff::extract_diff;
+pub use diff::{DiffResult, compute_diff, extract_diff, is_sker_internal_path};
 pub use replay::{ReplayCommit, replay};
 pub use rules::generate_baseline;
 pub use sarif::{SARIF_VERSION, sarif_document};

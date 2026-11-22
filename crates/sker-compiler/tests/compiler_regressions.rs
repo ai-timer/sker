@@ -110,7 +110,12 @@ fn projection_is_identical_bounded_and_generates_domain_skills() {
             .keys()
             .any(|key| key.ends_with("/SKILL.md"))
     );
-    write_projections(&bundle, &root).unwrap();
+    write_projections(
+        &bundle,
+        &root,
+        &[sker_schema::AgentConfig::Preset("universal".into())],
+    )
+    .unwrap();
     for key in projection.skills.keys() {
         assert!(root.join(key).is_file());
     }

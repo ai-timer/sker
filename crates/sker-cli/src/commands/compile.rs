@@ -51,7 +51,8 @@ pub fn run(
         target_dir.join("bundle.sha256"),
         format!("{}\n", b.bundle_sha256),
     )?;
-    let _ = sker_compiler::write_projections(&b, &src);
+    let agents = super::agent::get_configured_agents(&src);
+    let _ = sker_compiler::write_projections(&b, &src, &agents);
 
     // Lifecycle warnings for rules
     let today = super::now();

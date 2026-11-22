@@ -21,6 +21,7 @@ NODE
 cat > "$tmp/mock-sker" <<'MOCK'
 #!/usr/bin/env bash
 set -e
+if [[ "$1" == "compile" ]]; then exit 0; fi
 [[ "$1 $2 $3" == "check --ci --sarif" ]]
 node "$REPORT_FACTORY" "$MOCK_CODE" "$MOCK_REPORT"
 exit "$MOCK_CODE"

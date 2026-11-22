@@ -53,5 +53,8 @@ jobs:
       - name: Build Sker CLI Release
         run: cargo build --release -p sker-cli
 
+      - name: Compile Sker Bundle
+        run: ./target/release/sker compile --repo .
+
       - name: Run Dogfooding Sker CI Check
         run: ./target/release/sker check --ci --sarif sker-results.sarif --json sker-check-report.json --repo .

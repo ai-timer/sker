@@ -45,12 +45,17 @@ sker init
 
 `sker init` 会自动执行以下操作：
 1. **识别语言环境**：自动检测项目使用的语言（Go、TypeScript/JavaScript、Python、Rust 等）；
-2. **检测 Agent 宿主环境**：识别 Claude Code (`.claude/`)、Codex (`.codex/`、`AGENTS.md`)、Antigravity 等；
-3. **生成配置文件**：
-   - 生成根目录 `.sker.yaml`（工程主配置）
-   - 创建 `.sker/rules/`（存放本地业务规则目录）
-   - 初始化或更新 `AGENTS.md`、`CLAUDE.md` 与 `.agents/rules/sker.md` 中的常驻引导块（不超过 300 tokens）；
-   - 配置 MCP 工具服务与 Hook（如 `.claude/settings.json`、`.codex/config.toml`）。
+2. **生成跨平台通用最小集**：根目录 `.sker.yaml`（工程主配置）、`.sker/rules/`（本地业务规则目录）与通用 `AGENTS.md` 常驻引导块（不超过 300 tokens）；
+3. **幂等维护 `.gitignore`**：追加 Sker 可重建缓存与临时报告（`.sker/bundle.*`、`.sker/cache/`、`.sker/tmp/`、`.sker/check.json`、`.sker/report.json`、`*.sarif`、`sker-report.json`、`sker-check-report.json`）；**绝不忽略 `.sker/credential.json`**（Agent PR 必须提交凭据供 CI 验证）；
+4. **自动初始编译**：生成 `.sker/bundle.rkyv`，`init` 后立刻运行 `sker check` / `sker doctor` 零报错可用。
+
+**克制的按需接入**：仅当仓库内原本已存在对应宿主目录（`.claude/`、`.codex/`、`.codebuddy/`、`.cursor/`、`.agent/` 等）时，才写入该工具的专属规则与 MCP 配置；仅在本机 `$HOME` 检测到工具而仓内未启用时，只打印友好 `hint`，绝不污染共享仓库。也可显式启用或后续补充：
+
+```bash
+sker init --agent claude,codebuddy   # 显式启用指定集成
+sker agent add cursor                # 后续按需补充
+sker init --git-hooks                # 安装 pre-commit 钩子兜底任意工具
+```
 
 ---
 
@@ -62,17 +67,15 @@ sker init
 sker doctor
 ```
 
-若全部就绪，将显示：
+若全部就绪，将显示（默认 `universal` 最小集示例，退出码 0）：
 ```text
 PASS bundle hash
 PASS AGENTS.md managed block <= 300 tokens
-PASS CLAUDE.md managed block <= 300 tokens
-PASS .agents/rules/sker.md managed block <= 300 tokens
-PASS MCP configuration
-PASS Antigravity configuration
-PASS Hook configuration
+SKIP optional universal MCP (.mcp.json not present; run 'sker agent add universal' if using an MCP client)
 SKIP optional Ledger: SKER_LEDGER_URL not configured
 ```
+
+> 默认初始化不写入 `.mcp.json`，doctor 对其仅 SKIP 不 FAIL；`sker init` → `sker doctor` → `sker check` 在全新空仓中三者均以退出码 0 通过。
 
 ---
 
@@ -100,12 +103,12 @@ sker baseline prune
 在开发者或 Agent 修改代码后，只需毫秒级扫描本次 Git 变更：
 
 ```bash
-# 检查当前未提交的变更
+# 检查当前工作区变更（已暂存 + 未暂存 + 未跟踪新文件；工作区干净时回退 parent..HEAD）
 sker check
 
 # 输出格式示例：
 # 6caf3f1b...: 0 finding(s), 42 changed line(s)
-# 退出码 0 代表检查通过
+# 退出码 0 代表检查通过；命中确定性 BLOCK 规则时退出码 1（pre-commit 钩子据此拦截）
 ```
 
 如果在规划变更前需要查询项目是否存在特定限制，可直接运行：

@@ -59,14 +59,21 @@ pub(crate) fn analyze(
                 check_lang(Yaml, &src, &ctx, &mut findings_with_anchor, &mut warnings)
             }
             "rs" => check_lang(Rust, &src, &ctx, &mut findings_with_anchor, &mut warnings),
-            "md" | "json" | "toml" | "txt" | "lock" | "gitignore" => {
+            // No AST parser for this extension: only report unsupported when an
+            // active deterministic rule actually scopes the file (and no
+            // exemption covers it). Unscoped files (LICENSE, Dockerfile, ...)
+            // must never make the analysis incomplete.
+            _ => {
                 let scoped = bundle.rules.iter().any(|r| {
                     r.track == RuleTrack::Deterministic
                         && path_matches(&r.scope.include_paths, &r.scope.exclude_paths, &file.path)
+                        && !r
+                            .exemptions
+                            .iter()
+                            .any(|e| e.paths.iter().any(|p| glob(p, &file.path)))
                 });
                 !scoped
             }
-            _ => false,
         };
         if !found {
             unsupported.push(file.path.clone());

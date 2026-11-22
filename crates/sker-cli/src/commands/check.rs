@@ -21,21 +21,20 @@ pub fn run(
             .map_err(|e| anyhow::anyhow!("Federated rules lock verification failed: {e}"))?;
     }
     let b = super::support::bundle_with_override(&repo, bundle_override)?;
-    let base = base
+    let explicit_base = base
         .map(str::to_owned)
-        .or_else(|| std::env::var("GITHUB_BASE_SHA").ok())
-        .unwrap_or_else(|| "HEAD^".into());
-    let diff = sker_analyzer::extract_diff(
+        .or_else(|| std::env::var("GITHUB_BASE_SHA").ok());
+    let diff_result = sker_analyzer::compute_diff(
         repo.to_str().context("non-UTF8 repository path")?,
-        &base,
-        "HEAD",
+        explicit_base.as_deref(),
+        ci,
     )
     .context("unable to compute Git diff")?;
     let request = AnalysisRequest {
         repository_root: repo.to_string_lossy().into_owned(),
-        base_revision: base,
-        head_revision: "HEAD".into(),
-        diff,
+        base_revision: diff_result.base_revision,
+        head_revision: diff_result.head_revision,
+        diff: diff_result.entries,
         baseline: load_baseline(&repo)?,
         now: now(),
     };
@@ -111,7 +110,7 @@ pub fn run(
     if ci && !report.analysis.complete {
         std::process::exit(2)
     }
-    if ci && report.status == CheckStatus::Blocked {
+    if report.status == CheckStatus::Blocked {
         std::process::exit(1)
     }
     Ok(())

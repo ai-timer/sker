@@ -4,6 +4,7 @@
 //! archived bundle format is validated with rkyv's safe `access` API before
 //! consumers read the archive.
 
+mod agent;
 mod analysis;
 mod bundle;
 mod credential;
@@ -16,6 +17,7 @@ mod traits;
 #[cfg(test)]
 mod tests;
 
+pub use agent::{AGENT_PRESETS, AgentConfig, AgentPreset, CustomAgentConfig, find_agent_preset};
 pub use analysis::{
     AnalysisRequest, AnalysisSummary, BaselineItem, CheckFinding, CheckReport, CheckStatus,
     DiffEntry, DiffStatus, FindingDisposition, ReplayReport, ReplayRuleStats,

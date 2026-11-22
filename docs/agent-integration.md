@@ -6,10 +6,12 @@ Sker 专为让各种 AI 编码助手（Codex、Claude Code、Antigravity、Curso
 
 ## 1. 代理两步工作协议 (Two-Step Protocol)
 
-在执行 `sker init` 后，Sker 会在项目根目录的 `AGENTS.md`、`CLAUDE.md` 与 `.agents/rules/sker.md` 中注入受管理的微型指令块（< 300 tokens）：
+在执行 `sker init` 后，Sker 会按 `.sker.yaml` 中启用的 `agents` 列表，在各接入点的规则文件（默认始终包含 `AGENTS.md`，启用 `claude` 时含 `CLAUDE.md`、启用 `antigravity` 时含 `.agent/rules/sker.md` 等）中幂等注入受管理的微型指令块（< 300 tokens）：
 
 ```markdown
 <!-- sker:managed:start -->
+1. Read the matched rule and its scope.
+2. Apply the rule, then run its positive and negative fixtures.
 Before changing code: run `sker consult` for the relevant paths.
 After changes: run `sker check` and resolve deterministic BLOCK findings.
 <!-- sker:managed:end -->
@@ -19,7 +21,53 @@ After changes: run `sker check` and resolve deterministic BLOCK findings.
 
 ---
 
-## 2. MCP 协议集成 (Model Context Protocol)
+## 2. 声明式 Agent 集成 (`sker agent`)
+
+Sker 采用**表驱动声明式预设 + 自定义声明**结构适配长尾工具生态。内置预设：`universal` / `claude` / `codex` / `antigravity` / `cursor` / `codebuddy` / `windsurf` / `opencode`。
+
+```bash
+# 列出全部内置预设与当前仓库启用状态
+sker agent list
+
+# 幂等启用预设（写入 .sker.yaml、生成托管块与 MCP 配置并重新编译投影）
+sker agent add codebuddy
+
+# 自定义声明：适配任意冷门/自研工具
+sker agent add custom --name inhouse-bot --rules-file .inhouse/rules.md --mcp-file .inhouse/mcp.json
+
+# 移除集成
+sker agent remove codebuddy
+
+# 打印标准 5 行通用 mcpServers JSON 片段，供任意 MCP 工具直接复制
+sker agent mcp-config
+```
+
+`sker init` 的默认行为是克制的：仅生成跨平台通用最小集（`.sker.yaml` + `.sker/rules/` + `AGENTS.md`）并自动完成初始编译；只有仓库内原本已存在对应宿主目录（如 `.claude/`、`.codex/`、`.codebuddy/`、`.cursor/`、`.agent/`）或显式传入 `--agent claude,codebuddy` 时才写入专属配置。仅在本机 `$HOME` 检测到工具时只打印 `hint`，绝不污染共享仓库。
+
+对于不支持 MCP / AGENTS.md 的工具，可用 git 钩子兜底：
+
+```bash
+sker init --git-hooks   # 安装 .git/hooks/pre-commit 调用 sker check
+```
+
+### 内置预设落盘位置
+
+| 预设 | 规则文件 | MCP 配置 |
+| :--- | :--- | :--- |
+| `universal` | `AGENTS.md` | `.mcp.json` |
+| `claude` | `CLAUDE.md` | `.claude/settings.json`（含 PreToolUse Hook） |
+| `codex` | `AGENTS.md` | `.codex/config.toml` |
+| `antigravity` | `.agent/rules/sker.md` | `.mcp.json` |
+| `cursor` | `.cursorrules` | `.cursor/mcp.json` |
+| `codebuddy` | `.codebuddy/rules/sker.md` | `.codebuddy/mcp.json` |
+| `windsurf` | `.windsurfrules` | `.codeium/windsurf/mcp_config.json` |
+| `opencode` | `AGENTS.md` | `opencode.json` |
+
+> **默认 `universal` 与显式启用的区别**：未传 `--agent` 且仓内无宿主目录时，fallback 的 `universal` 只投影 `AGENTS.md`，**不会写入 `.mcp.json`**；此时 `sker doctor` 对缺失的 `.mcp.json` 输出 `SKIP optional universal MCP`（绝不判 FAIL）。仅当显式执行 `sker agent add universal`（或 `sker init --agent universal`）时才写入上表中的 MCP 配置；若 `.mcp.json` 已存在但损坏或缺少 `sker` 入口，doctor 仍会判 FAIL。
+
+---
+
+## 3. MCP 协议集成 (Model Context Protocol)
 
 Sker 内置标准的 Model Context Protocol (MCP) 服务器，支持 Claude Desktop、Codex CLI、Cursor 等现代化 Agent 环境。
 
@@ -72,9 +120,31 @@ args = ["mcp"]
 }
 ```
 
+#### CodeBuddy (`.codebuddy/mcp.json`)
+```json
+{
+  "mcpServers": {
+    "sker": {
+      "command": "sker",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+#### 任意其他 MCP 工具
+运行 `sker agent mcp-config` 获取通用片段直接复制：
+```json
+{
+  "mcpServers": {
+    "sker": { "command": "sker", "args": ["mcp"] }
+  }
+}
+```
+
 ---
 
-## 3. 编辑器与工具拦截 Hook (`sker hook`)
+## 4. 编辑器与工具拦截 Hook (`sker hook`)
 
 当 Agent 尝试通过工具直接写入违规代码时，可在 Tool Use 前后挂载 `sker hook` 进行即时拦截：
 
@@ -88,9 +158,11 @@ sker hook --hard-block
 
 在 Claude Code 中可将其配置为 Tool Call 拦截器，一旦生成的文件命中了确定性 `BLOCK` 规则，Hook 会在写入前向 Agent 吐出清晰的错误及建议替换方案，迫使 Agent 自动进行重试修复。
 
+> 在交互终端直接运行 `sker hook` 时，会先向 `stderr` 打印等待提示（正常由 Agent Hook 管道喂入 PreToolUse JSON；手动调试可粘贴 JSON 后按 Ctrl+D / Ctrl+C），`stdout` 的 JSON 输出协议保持不变。
+
 ---
 
-## 4. 防篡改 Agent 凭据签发 (`sker attest`)
+## 5. 防篡改 Agent 凭据签发 (`sker attest`)
 
 当代码修改完成并经过本地检查后，Agent 可通过 `sker attest` 生成加密签名的合规凭据：
 

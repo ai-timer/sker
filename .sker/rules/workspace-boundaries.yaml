@@ -10,7 +10,6 @@ scope:
   include_paths:
     - "crates/**/*.rs"
     - "apps/**/*.rs"
-    - "Cargo.toml"
 signals:
   - signal_id: extern-c-forbidden
     languages: [rust]

@@ -142,6 +142,45 @@ set -e
 # Test 3: Exit Code 2 (Incomplete analysis due to unsupported path)
 # ---------------------------------------------------------------------------
 echo "--- Scenario 2: Incomplete analysis -> Exit code 2 ---"
+# Only files covered by an active deterministic rule scope may trigger
+# incomplete. Add a rule scoping *.bin, then recompile so the bundle sees it.
+cat > "$git_repo/.sker/rules/bin-scope.yaml" <<'YAML'
+schema_version: sker.entry/v1
+rule_id: regression.bin.no-eval
+version: 1.0.0
+title: Binary artifacts must not embed eval payloads
+domain: security
+description: Scoped deterministic rule covering binary artifacts.
+severity: BLOCK
+track: deterministic
+scope:
+  include_paths: ["**/*.bin"]
+signals:
+  - signal_id: bin-eval
+    languages: [python]
+    description: eval call
+    pattern: "eval($$$ARGS)"
+exemptions: []
+overrides: []
+fixtures:
+  - fixture_id: eval-call
+    polarity: positive
+    path: examples/sample-playbook/fixtures/py-no-eval/positive/eval.py
+    expected: trigger
+  - fixture_id: safe-int-call
+    polarity: negative
+    path: examples/sample-playbook/fixtures/py-no-eval/negative/safe.py
+    expected: no_trigger
+compliant_alternatives: ["ast.literal_eval(...)"]
+lifecycle:
+  kind: ordinary
+  cooldown_hours: 24
+consult:
+  synonyms: []
+  keywords: []
+tags: [binary]
+YAML
+"$sker_bin" compile --repo "$git_repo" >/dev/null
 echo "unsupported format" > "$git_repo/services/payments/unsupported.bin"
 git -C "$git_repo" add services/payments/unsupported.bin
 git -C "$git_repo" commit -qm "add unsupported file"

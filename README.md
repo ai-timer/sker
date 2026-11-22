@@ -16,10 +16,10 @@
 | :--- | :--- |
 | 🚀 **[快速开始 (Quickstart)](docs/quickstart.md)** | 5 分钟在已有或全新业务仓中接入 Sker 全流程 |
 | ✍️ **[规约编写与 Fixtures (Writing Rules)](docs/writing-rules.md)** | AST 语法规则、启发式语义规则、强制测试夹具与防投毒覆盖 |
-| 🤖 **[Agent 深度集成 (Agent Integration)](docs/agent-integration.md)** | Codex / Claude Code / Antigravity / Cursor 接入、MCP 工具与 Hook 拦截 |
+| 🤖 **[Agent 深度集成 (Agent Integration)](docs/agent-integration.md)** | Codex / Claude Code / Antigravity / Cursor / CodeBuddy 声明式接入、MCP 工具与 Hook 拦截 |
 | 🛡️ **[CI 权威重算与审计 (CI & Audit)](docs/ci-and-audit.md)** | GitHub Composite Action、SARIF 报告与人机混合判定模型 |
 | 📊 **[Ledger 遥测与治理 (Ledger & Telemetry)](docs/ledger-and-telemetry.md)** | 部署监控大盘、CLI/CI 遥测端到端上报、7 项核心指标与 SNR 噪音率治理 |
-| 📖 **[CLI 完整命令参考 (CLI Reference)](docs/cli-reference.md)** | 全部 12 个 CLI 子命令语法、Flags 参数、配置文件 Schema 及退出码速查 |
+| 📖 **[CLI 完整命令参考 (CLI Reference)](docs/cli-reference.md)** | 全部 13 个 CLI 子命令语法、Flags 参数、配置文件 Schema 及退出码速查 |
 
 ---
 
@@ -61,7 +61,7 @@ brew install ai-timer/tap/sker
 ## 5 分钟上手体验
 
 ```bash
-# 1. 在项目根目录初始化 Sker 规约与 Agent 指导（自动生成 .sker.yaml 与引导块）
+# 1. 在项目根目录初始化 Sker 规约与 Agent 指导（自动生成 .sker.yaml、引导块与初始 bundle）
 sker init
 
 # 2. 检查开发环境就绪状态
@@ -70,11 +70,15 @@ sker doctor
 # 3. 冻结存量代码债务（后续日常检查仅关注 Git 增量 diff）
 sker baseline freeze
 
-# 4. 执行本地增量检查（毫秒级输出）
+# 4. 执行本地增量检查（毫秒级输出，扫描工作区全部新增/修改行）
 sker check
 
 # 5. Agent 规划前检索相关防踩坑提示
 sker consult "use raw sql query" src/db/
+
+# 6. 按需启用更多 Agent 集成（claude / codex / cursor / codebuddy / windsurf / opencode ...）
+sker agent list
+sker agent add codebuddy
 ```
 
 ---
