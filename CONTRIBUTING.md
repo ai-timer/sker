@@ -64,7 +64,7 @@ cargo tree -i openssl-sys
 
 # 6. 本仓 Dogfooding 门禁重算校验
 #    （.sker/bundle.* 已被 gitignore，须先 compile 重建规则包）
-cargo build --release -p sker-cli
+cargo build --release -p sker
 ./target/release/sker compile --repo .
 ./target/release/sker check --ci --sarif target/sker.sarif --json target/sker.json --repo .
 ```

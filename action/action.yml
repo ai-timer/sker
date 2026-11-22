@@ -38,8 +38,8 @@ runs:
       shell: bash
       run: |
         if ! command -v sker >/dev/null 2>&1; then
-          echo "Sker CLI not found on PATH, installing v0.1.0-preview..."
-          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ai-timer/sker/releases/download/v0.1.0-preview/sker-cli-installer.sh | sh
+          echo "Sker CLI not found on PATH, installing v0.1.1-preview..."
+          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ai-timer/sker/releases/download/v0.1.1-preview/sker-installer.sh | sh
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
         fi
     - name: Classify PR

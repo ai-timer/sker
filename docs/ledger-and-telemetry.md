@@ -4,6 +4,8 @@
 
 **Sker Ledger** 是一套独立的异步遥测与合规审计账本系统（Axum + SQLx + PostgreSQL），旨在通过**规则信噪比（SNR）**与**生命周期半衰期模型**，持续监控并淘汰衰变规则。
 
+> **可选组件声明**：Sker Ledger 是**可选的团队级度量与看板组件**，通过 `ghcr.io/ai-timer/sker-ledger` 容器镜像分发。**仅使用 `sker` CLI 与 GitHub Action CI 门禁完全无需部署 Ledger 或 PostgreSQL**——所有本地检查、凭据审计与 CI 阻断均独立工作；遥测上报为 fail-open 异步设计，未配置 Ledger 时自动跳过。
+
 ---
 
 ## 1. 架构与隐私保护原则
@@ -19,9 +21,9 @@
 
 ## 2. 部署 Sker Ledger
 
-### 方式一：Docker Compose 快速拉起（推荐）
+### 方式一：Docker Compose 一键拉起 GHCR 官方镜像（推荐，无需本地编译）
 
-在 `apps/sker-ledger` 目录下已内置了开箱即用的 Compose 配置：
+`apps/sker-ledger/docker-compose.yml` 默认直接拉取官方预构建镜像 `ghcr.io/ai-timer/sker-ledger`（推送 `v*` Release Tag 时由 CI 原生 linux/amd64 构建并发布），开箱即用：
 
 ```bash
 cd apps/sker-ledger
@@ -31,13 +33,26 @@ cp .env.example .env
 # 编辑 .env 设置高强度密钥
 export LEDGER_BEARER_TOKEN="your-secure-telemetry-token"
 
-# 2. 启动 Postgres 与 Ledger 容器
+# 2. 启动 Postgres 与 Ledger 容器（默认镜像标签 v0.1.1-preview，
+#    可通过 SKER_LEDGER_VERSION 环境变量覆盖，如 export SKER_LEDGER_VERSION=v0.1.2）
 docker compose up -d
 
 # 3. 验证就绪状态
 curl -i http://localhost:8080/healthz
 # HTTP/1.1 200 OK
 # {"status":"ready","database":"connected"}
+```
+
+> 若仓库/镜像包为私有，先执行 `docker login ghcr.io -u <github-user> --password-stdin <<< "$GITHUB_TOKEN"`（需 `read:packages` 权限）。
+
+#### 本地源码构建验证（开发者可选）
+
+需要验证本地最新源码时，叠加 `docker-compose.dev.yml` 覆盖文件，从当前工作区源码构建镜像：
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+# 或直接运行完整冒烟测试（自动使用 dev 覆盖构建本地源码）：
+bash scripts/verify-compose.sh
 ```
 
 启动后可在浏览器访问治理看板：
@@ -85,7 +100,7 @@ telemetry:
 
 ```yaml
       - name: Run Sker Governance Gate
-        uses: ai-timer/sker/action@v0.1.0-preview
+        uses: ai-timer/sker/action@v0.1.1-preview
         with:
           sker-path: sker
           sarif-file: sker-results.sarif

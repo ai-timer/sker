@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1-preview] - 2026-11-22
+
+### Changed
+- **统一包名为 `sker`**：CLI crate 的 `[package].name` 由 `sker-cli` 改为 `sker`（目录仍为 `crates/sker-cli/`，二进制名仍为 `sker`）。Homebrew 公式统一为 `sker.rb`（`brew install ai-timer/tap/sker`），安装脚本统一为 `sker-installer.sh`，产物为 `sker-<target>.tar.xz`；`cargo-dist` 不再为 Ledger 生成安装器。
+- **`sker init` 最小化原则**：未传 `--agent` 时仅生成 `.sker.yaml`、`.sker/rules/`、`AGENTS.md`、`.gitignore` 与 `.sker/bundle.*`；$HOME 探测只打印 `hint`，绝不注入宿主配置；默认 `universal` 不写 `.mcp.json`。
+- **`sker doctor`**：默认 `universal` 缺失 `.mcp.json` 时输出 `SKIP optional universal MCP`（不再判 FAIL）；`init` → `doctor` → `check` 在全新空仓全部退出码 0。
+- **统一 `.gitignore`**：init 与本仓一致忽略 `.sker/bundle.*`、`.sker/cache/`、`.sker/tmp/`、`.sker/check.json`、`.sker/report.json`、`*.sarif`、`sker-report.json`、`sker-check-report.json`；**绝不忽略 `.sker/credential.json`**（Agent PR 凭据必须可提交）。CI（本仓 workflow 与复合 Action）在 `check --ci` 前先 `sker compile` 重建规则包。
+- **Sker Ledger 转为可选组件**：通过 `ghcr.io/ai-timer/sker-ledger` 容器镜像分发（`v*` Tag 触发原生 linux/amd64 构建），`docker-compose.yml` 默认拉取镜像开箱即用；仅使用 `sker` CLI 与 CI 门禁完全无需部署 Ledger 或 PostgreSQL。
+
+### Fixed
+- **非规约作用域文件不再误触发 incomplete（exit 2）**：仅当变更文件命中至少一条激活确定性规约的 scope（且未命中 exemptions）却无解析器时才记入 `unsupported_paths`；LICENSE、Dockerfile、.sql、.html 等无覆盖文件不再阻断。
+
 ## [0.1.0-preview] - 2026-11-19
 
 Sker 首个公开预览版发布！面向 AI 编码代理（Coding Agents）的负面知识护栏与可审计合规编译器。

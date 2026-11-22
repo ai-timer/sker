@@ -14,8 +14,8 @@ From the repository root:
 
 ```sh
 cargo build --workspace
-cargo run -p sker-cli -- init
-cargo run -p sker-cli -- doctor
+cargo run -p sker -- init
+cargo run -p sker -- doctor
 ```
 
 Expected: the workspace builds, `init` reports detected languages/hosts without duplicating managed blocks on a second run, and `doctor` reports each bundle/guidance/hook/MCP check with actionable failure details.
@@ -23,8 +23,8 @@ Expected: the workspace builds, `init` reports detected languages/hosts without 
 ## Compile and inspect a local diff
 
 ```sh
-cargo run -p sker-cli -- compile
-cargo run -p sker-cli -- check --format sarif
+cargo run -p sker -- compile
+cargo run -p sker -- check --format sarif
 ```
 
 Expected: compile writes a read-only bundle and stable hash; an override cycle or local downgrade of a central `BLOCK` is rejected without replacing the last valid bundle. `check` considers only added/modified diff lines, distinguishes deterministic findings from semantic triggers, and reports a SARIF location. A baseline item follows its syntax/symbol and normalized problem anchor across line movement; formatting/comment-only changes preserve the match.
@@ -34,7 +34,7 @@ Expected: compile writes a read-only bundle and stable hash; an override cycle o
 With network access disabled:
 
 ```sh
-cargo run -p sker-cli -- mcp
+cargo run -p sker -- mcp
 ```
 
 Connect an MCP client over standard input/output and invoke `consult`, `search`, and `attest` using the request fields in [contracts/README.md](contracts/README.md). Expected: retrieval uses local lexical relevance and synonym metadata, a low-relevance query returns an explicit empty result, and attestation verification fails if either the bundle or diff hash changes.
@@ -44,7 +44,7 @@ Connect an MCP client over standard input/output and invoke `consult`, `search`,
 Before committing the candidate change, let the local Agent/CLI collect consult trace before/during coding and finalize the credential:
 
 ```sh
-cargo run -p sker-cli -- attest
+cargo run -p sker -- attest
 ```
 
 Expected: local `sker attest` emits a credential containing consult trace, semantic verdicts, `bundle_sha256`, `diff_tree_hash`, and the BLAKE3 credential digest. CI must independently recompute the PR diff and validate the submitted credential; it must never create, repair, or replace one. Run the CI adapter against fixtures for valid and invalid credentials, a missing triggered semantic verdict, and a human PR with a high-risk semantic trigger. Invalid Agent evidence blocks; a human PR does not require Agent credentials and receives a self-check card. Disable the optional ledger and repeat; the gate result must remain identical.
@@ -90,7 +90,7 @@ cargo tree -i openssl-sys  # Must report empty / no matches
 
 - **Shell Installer**:
   ```sh
-  curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ai-timer/sker/releases/latest/download/sker-cli-installer.sh | sh
+  curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ai-timer/sker/releases/latest/download/sker-installer.sh | sh
   ```
 - **Homebrew Tap**:
   ```sh

@@ -7,7 +7,7 @@ use std::{
 fn root() -> std::path::PathBuf {
     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let p = std::env::temp_dir().join(format!(
-        "sker-cli-{}-{}-{}",
+        "sker-{}-{}-{}",
         std::process::id(),
         NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
         SystemTime::now()
@@ -21,7 +21,7 @@ fn root() -> std::path::PathBuf {
 #[test]
 fn clap_exposes_expected_command_tree() {
     // 1. Verify clap command graph invariants and absence of conflicts
-    let app = sker_cli::Cli::command();
+    let app = sker::Cli::command();
     app.clone().debug_assert();
 
     // 2. Verify root help output via CLI executable

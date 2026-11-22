@@ -51,7 +51,7 @@ jobs:
         run: bash action/scripts/test-action.sh
 
       - name: Build Sker CLI Release
-        run: cargo build --release -p sker-cli
+        run: cargo build --release -p sker
 
       - name: Compile Sker Bundle
         run: ./target/release/sker compile --repo .

@@ -10,7 +10,7 @@
 适用于 macOS 和 Linux（x86_64 及 Apple Silicon / ARM64）：
 
 ```bash
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ai-timer/sker/releases/download/v0.1.0-preview/sker-cli-installer.sh | sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ai-timer/sker/releases/download/v0.1.1-preview/sker-installer.sh | sh
 ```
 > 安装脚本会自动检测操作系统与架构，将预编译二进制下载并安装至 `~/.cargo/bin/sker`。请确保 `~/.cargo/bin` 已加入系统 `PATH`。
 
@@ -145,7 +145,7 @@ jobs:
           fetch-depth: 0 # 必须拉取完整历史以计算准确增量 diff
 
       - name: Run Sker Governance Gate
-        uses: ai-timer/sker/action@v0.1.0-preview
+        uses: ai-timer/sker/action@v0.1.1-preview
         with:
           sker-path: sker
           sarif-file: sker-results.sarif

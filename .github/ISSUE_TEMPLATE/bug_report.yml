@@ -12,7 +12,7 @@ body:
     attributes:
       label: 受影响组件 (Affected Component)
       options:
-        - "sker-cli (命令行工具)"
+        - "sker (命令行工具)"
         - "sker-analyzer / ast-grep (分析引擎)"
         - "sker-compiler (规则编译器)"
         - "sker-retriever / consult (检索器)"
@@ -26,7 +26,7 @@ body:
     id: version
     attributes:
       label: Sker 版本 (Sker Version)
-      placeholder: "e.g. v0.1.0-preview, git commit hash"
+      placeholder: "e.g. v0.1.1-preview, git commit hash"
     validations:
       required: true
   - type: textarea

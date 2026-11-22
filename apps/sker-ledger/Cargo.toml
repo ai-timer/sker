@@ -16,3 +16,7 @@ serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 anyhow.workspace = true
+
+# Ledger is distributed as a GHCR container image, not via cargo-dist installers.
+[package.metadata.dist]
+dist = false

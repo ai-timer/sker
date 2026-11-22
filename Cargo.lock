@@ -3724,26 +3724,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
 
 [[package]]
-name = "sker-analyzer"
-version = "0.1.0-preview"
-dependencies = [
- "anyhow",
- "ast-grep-config",
- "ast-grep-core",
- "ast-grep-language",
- "blake3",
- "gix",
- "globset",
- "rkyv",
- "serde",
- "serde_json",
- "sker-schema",
- "thiserror",
-]
-
-[[package]]
-name = "sker-cli"
-version = "0.1.0-preview"
+name = "sker"
+version = "0.1.1-preview"
 dependencies = [
  "anyhow",
  "blake3",
@@ -3761,8 +3743,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "sker-analyzer"
+version = "0.1.1-preview"
+dependencies = [
+ "anyhow",
+ "ast-grep-config",
+ "ast-grep-core",
+ "ast-grep-language",
+ "blake3",
+ "gix",
+ "globset",
+ "rkyv",
+ "serde",
+ "serde_json",
+ "sker-schema",
+ "thiserror",
+]
+
+[[package]]
 name = "sker-compiler"
-version = "0.1.0-preview"
+version = "0.1.1-preview"
 dependencies = [
  "anyhow",
  "ast-grep-config",
@@ -3781,7 +3781,7 @@ dependencies = [
 
 [[package]]
 name = "sker-ledger"
-version = "0.1.0-preview"
+version = "0.1.1-preview"
 dependencies = [
  "anyhow",
  "axum",
@@ -3795,7 +3795,7 @@ dependencies = [
 
 [[package]]
 name = "sker-mcp"
-version = "0.1.0-preview"
+version = "0.1.1-preview"
 dependencies = [
  "anyhow",
  "blake3",
@@ -3814,7 +3814,7 @@ dependencies = [
 
 [[package]]
 name = "sker-retriever"
-version = "0.1.0-preview"
+version = "0.1.1-preview"
 dependencies = [
  "anyhow",
  "globset",
@@ -3829,7 +3829,7 @@ dependencies = [
 
 [[package]]
 name = "sker-schema"
-version = "0.1.0-preview"
+version = "0.1.1-preview"
 dependencies = [
  "anyhow",
  "blake3",

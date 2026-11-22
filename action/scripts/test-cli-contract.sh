@@ -8,7 +8,7 @@ sker_bin="${SKER_BIN:-$repo_root/target/release/sker}"
 
 if [[ ! -x "$sker_bin" ]]; then
   echo "Building release sker binary..."
-  cargo build --release -p sker-cli --manifest-path "$repo_root/Cargo.toml"
+  cargo build --release -p sker --manifest-path "$repo_root/Cargo.toml"
 fi
 
 tmp="$(mktemp -d)"

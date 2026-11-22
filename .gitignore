@@ -2,7 +2,7 @@
 /target/
 **/*.rs.bk
 *.pdb
-# 注意：本仓库包含可执行二进制 (sker-cli / sker-ledger)，
+# 注意：本仓库包含可执行二进制 (sker / sker-ledger)，
 # 必须保留 Cargo.lock 进 Git 以保证构建可重现，不要忽略 Cargo.lock。
 
 # === Sker 可重建缓存与临时报告 ===

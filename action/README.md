@@ -28,11 +28,11 @@ jobs:
 
       - name: Install Sker CLI
         run: |
-          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ai-timer/sker/releases/download/v0.1.0-preview/sker-cli-installer.sh | sh
+          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ai-timer/sker/releases/download/v0.1.1-preview/sker-installer.sh | sh
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
       - name: Run Sker Governance Gate
-        uses: ai-timer/sker/action@v0.1.0-preview
+        uses: ai-timer/sker/action@v0.1.1-preview
         with:
           sker-path: sker
           sarif-file: sker-results.sarif
@@ -46,7 +46,7 @@ jobs:
 ## How It Works
 
 1. **PR Classification (`classify-pr.sh`)**: Inspects PR labels, commits, and local credentials (`.sker/credential.json`). If the PR contains `agent-authored` label or a credential file, it is classified as an Agent PR.
-2. **Authoritative CI Check (`run-check.sh`)**: Invokes:
+2. **Authoritative CI Check (`run-check.sh`)**: Rebuilds the gitignored rule bundle (`sker compile`), then invokes:
    ```text
    sker check --ci --sarif <sarif-file> --json <report-file>
    ```

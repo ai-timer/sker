@@ -1,8 +1,6 @@
 services:
   ledger:
-    build:
-      context: ../..
-      dockerfile: apps/sker-ledger/Dockerfile
+    image: ghcr.io/ai-timer/sker-ledger:${SKER_LEDGER_VERSION:-v0.1.1-preview}
     environment:
       DATABASE_URL: postgres://sker:sker@postgres:5432/sker_ledger
       LISTEN_ADDR: 0.0.0.0:8080

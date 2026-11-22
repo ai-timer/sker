@@ -1,0 +1,8 @@
+# Local source-build override for developers and the compose smoke test.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+services:
+  ledger:
+    image: sker-ledger:local
+    build:
+      context: ../..
+      dockerfile: apps/sker-ledger/Dockerfile

@@ -4,6 +4,7 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ledger_dir="$(cd "$script_dir/.." && pwd)"
 compose_file="$ledger_dir/docker-compose.yml"
+dev_file="$ledger_dir/docker-compose.dev.yml"
 
 echo "=== Verifying Docker Compose Setup for Sker Ledger ==="
 
@@ -11,7 +12,9 @@ if ! docker info >/dev/null 2>&1; then
   echo "SKIP: Docker daemon is not running on this host."
   echo "Validating docker-compose configuration offline..."
   LEDGER_BEARER_TOKEN="test-token" docker compose -f "$compose_file" config >/dev/null
-  echo "PASS: docker compose config syntax valid."
+  echo "PASS: default GHCR image compose config syntax valid."
+  LEDGER_BEARER_TOKEN="test-token" docker compose -f "$compose_file" -f "$dev_file" config >/dev/null
+  echo "PASS: local source-build dev overlay config syntax valid."
   echo "Validating SQL migration files..."
   for sql in "$ledger_dir"/migrations/*.sql; do
     [[ -f "$sql" ]] || continue
@@ -26,12 +29,12 @@ export LEDGER_BEARER_TOKEN="smoke-test-bearer-token-12345"
 
 cleanup() {
   echo "Cleaning up Compose test containers and volumes..."
-  docker compose -f "$compose_file" down -v --remove-orphans >/dev/null 2>&1 || true
+  docker compose -f "$compose_file" -f "$dev_file" down -v --remove-orphans >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
-echo "Starting Ledger + PostgreSQL 16..."
-docker compose -f "$compose_file" up -d --build
+echo "Starting Ledger + PostgreSQL 16 (building from local workspace source)..."
+docker compose -f "$compose_file" -f "$dev_file" up -d --build
 
 echo "Waiting for Ledger /healthz to report ready..."
 ready=0
@@ -48,7 +51,7 @@ done
 
 if [[ "$ready" -ne 1 ]]; then
   echo "Error: Ledger failed to become ready within timeout" >&2
-  docker compose -f "$compose_file" logs >&2
+  docker compose -f "$compose_file" -f "$dev_file" logs >&2
   exit 1
 fi
 

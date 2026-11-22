@@ -41,7 +41,7 @@ jobs:
           fetch-depth: 0 # 必须拉取完整历史以提取精确 diff
 
       - name: Run Sker PR Governance Action
-        uses: ai-timer/sker/action@v0.1.0-preview
+        uses: ai-timer/sker/action@v0.1.1-preview
         with:
           sker-path: sker
           sarif-file: sker-results.sarif

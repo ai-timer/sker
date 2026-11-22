@@ -18,7 +18,7 @@
 | ✍️ **[规约编写与 Fixtures (Writing Rules)](docs/writing-rules.md)** | AST 语法规则、启发式语义规则、强制测试夹具与防投毒覆盖 |
 | 🤖 **[Agent 深度集成 (Agent Integration)](docs/agent-integration.md)** | Codex / Claude Code / Antigravity / Cursor / CodeBuddy 声明式接入、MCP 工具与 Hook 拦截 |
 | 🛡️ **[CI 权威重算与审计 (CI & Audit)](docs/ci-and-audit.md)** | GitHub Composite Action、SARIF 报告与人机混合判定模型 |
-| 📊 **[Ledger 遥测与治理 (Ledger & Telemetry)](docs/ledger-and-telemetry.md)** | 部署监控大盘、CLI/CI 遥测端到端上报、7 项核心指标与 SNR 噪音率治理 |
+| 📊 **[Ledger 遥测与治理 (Ledger & Telemetry)](docs/ledger-and-telemetry.md)** | **可选组件**：GHCR 镜像一键部署监控大盘、CLI/CI 遥测端到端上报、7 项核心指标与 SNR 噪音率治理 |
 | 📖 **[CLI 完整命令参考 (CLI Reference)](docs/cli-reference.md)** | 全部 13 个 CLI 子命令语法、Flags 参数、配置文件 Schema 及退出码速查 |
 
 ---
@@ -48,7 +48,7 @@ flowchart LR
 
 ### 方式一：官方一键安装（推荐，macOS & Linux）
 ```bash
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ai-timer/sker/releases/download/v0.1.0-preview/sker-cli-installer.sh | sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ai-timer/sker/releases/download/v0.1.1-preview/sker-installer.sh | sh
 ```
 
 ### 方式二：Homebrew (macOS)
@@ -110,13 +110,30 @@ jobs:
           fetch-depth: 0 # 拉取完整 Git 历史
 
       - name: Run Sker CI Check
-        uses: ai-timer/sker/action@v0.1.0-preview
+        uses: ai-timer/sker/action@v0.1.1-preview
         with:
           sker-path: sker
           sarif-file: sker-results.sarif
           report-file: sker-check-report.json
           protected-agent-label: agent-authored
 ```
+
+---
+
+## 可选组件：Sker Ledger 遥测看板
+
+**Sker Ledger 是可选的团队级度量与治理看板**，通过 GHCR 容器镜像 `ghcr.io/ai-timer/sker-ledger` 分发（推送 `v*` Tag 时由 CI 原生 linux/amd64 构建发布）。**仅使用 `sker` CLI 与 GitHub Action CI 门禁完全无需部署 Ledger 或 PostgreSQL**——本地检查、凭据审计与 CI 阻断均独立工作；遥测上报为 fail-open 异步设计，未配置 Ledger 时自动跳过。
+
+需要团队级规则健康度看板时，一键拉起官方镜像：
+
+```bash
+cd apps/sker-ledger
+cp .env.example .env        # 编辑设置 LEDGER_BEARER_TOKEN
+docker compose up -d        # 默认拉取 ghcr.io/ai-timer/sker-ledger:v0.1.1-preview
+# 治理看板: http://localhost:8080/dashboard
+```
+
+详见 **[Ledger 遥测与治理](docs/ledger-and-telemetry.md)**。
 
 ---
 
