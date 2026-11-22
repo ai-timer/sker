@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "sker": {
+      "args": [
+        "mcp"
+      ],
+      "command": "sker"
+    }
+  }
+}

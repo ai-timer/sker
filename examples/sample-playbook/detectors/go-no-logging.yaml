@@ -1,0 +1,7 @@
+id: go-no-logging
+language: Go
+rule:
+  any:
+    - pattern: fmt.Printf($FMT, $$$ARGS)
+    - pattern: fmt.Println($$$ARGS)
+    - pattern: fmt.Print($$$ARGS)

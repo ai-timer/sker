@@ -14,13 +14,17 @@ members = [
 version = "0.1.0-preview"
 edition = "2024"
 license = "Apache-2.0"
+readme = "README.md"
+homepage = "https://github.com/ai-timer/sker"
+repository = "https://github.com/ai-timer/sker"
+description = "Sker: offline-first negative knowledge guardrails and auditable compliance compiler for AI coding agents"
 
 [workspace.dependencies]
 # 核心分析与协议
 ast-grep-core = "0.51.3"
 ast-grep-language = "0.51.3"
 ast-grep-config = "0.51.3"
-rmcp = { version = "3.10.0", features = ["server", "macros", "transport-io"] }
+rmcp = { version = "3.10.0", features = ["server", "macros", "transport-io", "schemars"] }
 gix = { version = "0.90.0", default-features = false, features = [
   "sha1",
   "revision",
@@ -35,6 +39,7 @@ tantivy = "0.27.0"
 blake3 = "1.8"
 rkyv = { version = "0.8", features = ["bytecheck"] }
 schemars = "1.2"
+sha2 = "0.10"
 
 # 通用工程库
 serde = { version = "1.0", features = ["derive"] }
@@ -53,3 +58,8 @@ sqlx = { version = "0.8", features = [
   "json",
   "chrono",
 ] }
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"

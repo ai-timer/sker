@@ -1,0 +1,13 @@
+use serde_json::{Value, json};
+use sker_schema::{CheckReport, FindingDisposition};
+pub const SARIF_VERSION: &str = "2.1.0";
+pub fn sarif_document(report: &CheckReport) -> Value {
+    let results:Vec<_>=report.findings.iter().map(|f|json!({"ruleId":f.rule_id,"level":match f.severity {sker_schema::RuleSeverity::Block=>"error",sker_schema::RuleSeverity::Warn=>"warning",sker_schema::RuleSeverity::Info=>"note"},"message":{"text":f.message},"locations":[{"physicalLocation":{"artifactLocation":{"uri":f.path},"region":{"startLine":f.start_line,"endLine":f.end_line}}}],"properties":{"track":match f.track{sker_schema::RuleTrack::Deterministic=>"deterministic",sker_schema::RuleTrack::Semantic=>"semantic"},"disposition":serde_json::to_value(&f.disposition).unwrap_or(Value::Null),"alternatives":f.alternatives}})).collect();
+    let rules: Vec<_> = report
+        .findings
+        .iter()
+        .map(|f| json!({"id":f.rule_id,"name":f.rule_id,"shortDescription":{"text":f.message}}))
+        .collect();
+    let _ = FindingDisposition::Blocked;
+    json!({"version":SARIF_VERSION,"$schema":"https://json.schemastore.org/sarif-2.1.0.json","runs":[{"tool":{"driver":{"name":"sker-analyzer","rules":rules}},"results":results}]})
+}

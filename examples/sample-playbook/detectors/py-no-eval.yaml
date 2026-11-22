@@ -1,0 +1,6 @@
+id: py-no-eval
+language: Python
+rule:
+  any:
+    - pattern: eval($$$ARGS)
+    - pattern: exec($$$ARGS)

@@ -1,0 +1,39 @@
+schema_version: sker.entry/v1
+rule_id: py.no-eval
+version: 1.0.0
+title: Avoid dangerous eval in Python
+domain: security.code-execution
+description: Do not use eval() to execute dynamic code; use safe parsing instead.
+rationale: Dynamic code evaluation with eval() introduces arbitrary code execution vulnerabilities.
+severity: BLOCK
+track: deterministic
+scope:
+  include_paths:
+    - "**/*.py"
+detector: detectors/py-no-eval.yaml
+signals:
+  - signal_id: py-eval-call
+    languages: [python]
+    description: An eval call in changed Python code.
+    pattern: "eval($$$ARGS)"
+exemptions: []
+overrides: []
+fixtures:
+  - fixture_id: eval-call
+    polarity: positive
+    path: examples/sample-playbook/fixtures/py-no-eval/positive/eval.py
+    expected: trigger
+  - fixture_id: safe-int-call
+    polarity: negative
+    path: examples/sample-playbook/fixtures/py-no-eval/negative/safe.py
+    expected: no_trigger
+compliant_alternatives:
+  - "ast.literal_eval(x)"
+  - "int(x)"
+lifecycle:
+  kind: ordinary
+  cooldown_hours: 24
+consult:
+  synonyms: [eval, dynamic execution, code injection]
+  keywords: [security, python, eval]
+tags: [python, deterministic, security]

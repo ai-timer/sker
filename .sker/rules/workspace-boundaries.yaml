@@ -1,0 +1,38 @@
+schema_version: sker.entry/v1
+rule_id: rust.no-c-dependencies
+version: 1.0.0
+title: Avoid C-linked dependencies and extern "C"
+domain: architecture.rust-constraints
+description: "Enforce Constitution Rust Constraints: No git2, openssl-sys, or extern 'C'. Use gix and rustls."
+severity: BLOCK
+track: deterministic
+scope:
+  include_paths:
+    - "crates/**/*.rs"
+    - "apps/**/*.rs"
+signals:
+  - signal_id: extern-c-forbidden
+    languages: [rust]
+    description: Disallow extern "C" declarations
+    pattern: 'extern "C" { $$$DECLS }'
+exemptions: []
+overrides: []
+fixtures:
+  - fixture_id: extern-c
+    polarity: positive
+    path: .sker/fixtures/workspace-boundaries/positive.rs
+    expected: trigger
+  - fixture_id: pure-rust
+    polarity: negative
+    path: .sker/fixtures/workspace-boundaries/negative.rs
+    expected: no_trigger
+compliant_alternatives:
+  - "Use gix for git operations and rustls for TLS"
+  - "Use pure-Rust crates without C dependencies or extern 'C'"
+lifecycle:
+  kind: ordinary
+  cooldown_hours: 24
+consult:
+  synonyms: ["extern C", "c dependencies", "openssl-sys", "libgit2"]
+  keywords: ["rust", "c-link", "security", "pure-rust"]
+tags: ["rust", "deterministic", "constitution"]

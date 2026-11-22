@@ -1,0 +1,185 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sker.dev/schemas/entry/v1.json",
+  "title": "Sker Rule Entry v1",
+  "description": "One source rule entry encoded as YAML. This JSON Schema validates the YAML data model after YAML-to-JSON parsing; compiler checks also enforce cross-entry precedence, source authority, and fixture contents.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "rule_id",
+    "version",
+    "title",
+    "domain",
+    "description",
+    "severity",
+    "track",
+    "scope",
+    "signals",
+    "exemptions",
+    "overrides",
+    "fixtures",
+    "lifecycle",
+    "consult"
+  ],
+  "properties": {
+    "schema_version": {"const": "sker.entry/v1"},
+    "rule_id": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+    "version": {"type": "string", "minLength": 1, "maxLength": 64},
+    "title": {"type": "string", "minLength": 3, "maxLength": 200},
+    "domain": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9._/-]*$"},
+    "description": {"type": "string", "minLength": 1, "maxLength": 10000},
+    "rationale": {"type": "string", "maxLength": 10000},
+    "severity": {"enum": ["BLOCK", "WARN", "INFO"]},
+    "track": {"enum": ["deterministic", "semantic"]},
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["include_paths"],
+      "properties": {
+        "include_paths": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/pathPattern"}},
+        "exclude_paths": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/pathPattern"}}
+      }
+    },
+    "signals": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/signal"}
+    },
+    "exemptions": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/exemption"}
+    },
+    "overrides": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/override"}
+    },
+    "fixtures": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/fixture"}
+    },
+    "compliant_alternatives": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1, "maxLength": 2000},
+      "uniqueItems": true
+    },
+    "lifecycle": {"$ref": "#/$defs/lifecycle"},
+    "consult": {"$ref": "#/$defs/consultMetadata"},
+    "tags": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 64}}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"track": {"const": "semantic"}}, "required": ["track"]},
+      "then": {
+        "properties": {
+          "signals": {"minItems": 1}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"track": {"const": "deterministic"}}, "required": ["track"]},
+      "then": {
+        "required": ["compliant_alternatives"],
+        "properties": {
+          "compliant_alternatives": {"minItems": 1},
+          "fixtures": {
+            "allOf": [
+              {"contains": {"properties": {"polarity": {"const": "positive"}}, "required": ["polarity"]}, "minContains": 1},
+              {"contains": {"properties": {"polarity": {"const": "negative"}}, "required": ["polarity"]}, "minContains": 1}
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "pathPattern": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$",
+      "description": "Repository-relative glob; absolute paths and parent traversal are not allowed."
+    },
+    "fixturePath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*[*?\\[\\]{}]).+$",
+      "description": "Repository-relative path to one concrete fixture file; glob metacharacters, absolute paths, and parent traversal are not allowed."
+    },
+    "language": {"enum": ["go", "python", "typescript", "yaml", "infra", "any"]},
+    "signal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["signal_id", "languages", "description", "pattern"],
+      "properties": {
+        "signal_id": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+        "languages": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/language"}},
+        "description": {"type": "string", "minLength": 1, "maxLength": 2000},
+        "pattern": {"type": "string", "minLength": 1, "maxLength": 4096, "description": "Syntax-aware or lexical pattern interpreted by the declared analyzer rule kind."}
+      }
+    },
+    "exemption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exemption_id", "paths", "reason", "expires_at", "approved_by"],
+      "properties": {
+        "exemption_id": {"type": "string", "minLength": 1, "maxLength": 128},
+        "paths": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/pathPattern"}},
+        "reason": {"type": "string", "minLength": 1, "maxLength": 4000},
+        "expires_at": {"type": "string", "format": "date-time"},
+        "approved_by": {"type": "string", "minLength": 1, "maxLength": 256}
+      }
+    },
+    "override": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target_rule_id", "relation", "reason"],
+      "properties": {
+        "target_rule_id": {"type": "string", "minLength": 1, "maxLength": 128},
+        "relation": {"enum": ["supersedes", "narrows", "requires"]},
+        "reason": {"type": "string", "minLength": 1, "maxLength": 4000}
+      }
+    },
+    "fixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fixture_id", "polarity", "path", "expected"],
+      "properties": {
+        "fixture_id": {"type": "string", "minLength": 1, "maxLength": 128},
+        "polarity": {"enum": ["positive", "negative"]},
+        "path": {"$ref": "#/$defs/fixturePath"},
+        "expected": {"enum": ["trigger", "no_trigger"]}
+      },
+      "allOf": [
+        {"if": {"properties": {"polarity": {"const": "positive"}}, "required": ["polarity"]}, "then": {"properties": {"expected": {"const": "trigger"}}}},
+        {"if": {"properties": {"polarity": {"const": "negative"}}, "required": ["polarity"]}, "then": {"properties": {"expected": {"const": "no_trigger"}}}}
+      ]
+    },
+    "lifecycle": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "cooldown_hours"],
+          "properties": {"kind": {"const": "ordinary"}, "cooldown_hours": {"const": 24}, "reviewBy": {"type": "string"}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "hotfix_expires_at"],
+          "properties": {"kind": {"const": "incident_hotfix"}, "hotfix_expires_at": {"type": "string", "format": "date-time"}, "reviewBy": {"type": "string"}}
+        }
+      ]
+    },
+    "consultMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["synonyms"],
+      "properties": {
+        "synonyms": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 128}},
+        "keywords": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 128}}
+      }
+    }
+  }
+}

@@ -76,4 +76,4 @@ and last-amended date. Compliance MUST be reviewed during pull request review, a
 violations MUST be corrected before merge or addressed by an approved Constitution
 amendment.
 
-**Version**: 1.0.0 | **Ratified**: TODO(RATIFICATION_DATE): confirm original adoption date | **Last Amended**: 2026-11-17
+**Version**: 1.0.0 | **Ratified**: 2026-11-17 | **Last Amended**: 2026-11-17

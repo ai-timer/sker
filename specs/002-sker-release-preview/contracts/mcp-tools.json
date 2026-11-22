@@ -1,0 +1,225 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sker.dev/contracts/mcp-tools/v1.json",
+  "title": "Sker MCP tools, rmcp 3.10.0 contract",
+  "description": "Tool definitions for the local stdio MCP server. Each inputSchema and outputSchema is an object schema suitable for rmcp 3.10.0 with server/macros/transport-io/schemars. Outputs use object-shaped structuredContent.",
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "blake3": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  },
+  "tools": [
+    {
+      "name": "sker_consult",
+      "description": "Return only locally relevant rules for intent and target paths; low relevance is an explicit no_match.",
+      "annotations": {"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false},
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": false,
+        "$defs": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}},
+        "required": ["intent", "paths"],
+        "properties": {
+          "intent": {"type": "string", "minLength": 1, "maxLength": 4000},
+          "paths": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 512}},
+          "limit": {"type": "integer", "minimum": 1, "maximum": 50, "default": 10},
+          "bundle_sha256": {"$ref": "#/$defs/sha256"}
+        }
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": false,
+        "$defs": {
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "error": {"type": "object", "additionalProperties": false, "required": ["code", "message"], "properties": {"code": {"type": "string"}, "message": {"type": "string"}}},
+          "ruleMatch": {"type": "object", "additionalProperties": false, "required": ["rule_id", "title", "domain", "severity", "track", "paths", "summary", "score"], "properties": {"rule_id": {"type": "string"}, "title": {"type": "string"}, "domain": {"type": "string"}, "severity": {"enum": ["BLOCK", "WARN", "INFO"]}, "track": {"enum": ["deterministic", "semantic"]}, "paths": {"type": "array", "items": {"type": "string"}}, "summary": {"type": "string"}, "score": {"type": "number", "minimum": 0, "maximum": 1}}}
+        },
+        "required": ["status", "bundle_sha256", "matches"],
+        "properties": {
+          "status": {"enum": ["matched", "no_match", "error"]},
+          "bundle_sha256": {"$ref": "#/$defs/sha256"},
+          "matches": {"type": "array", "items": {"$ref": "#/$defs/ruleMatch"}},
+          "error": {"$ref": "#/$defs/error"}
+        },
+        "allOf": [
+          {"if": {"properties": {"status": {"const": "error"}}, "required": ["status"]}, "then": {"required": ["error"]}},
+          {"if": {"properties": {"status": {"const": "no_match"}}, "required": ["status"]}, "then": {"properties": {"matches": {"maxItems": 0}}}},
+          {"if": {"properties": {"status": {"const": "matched"}}, "required": ["status"]}, "then": {"properties": {"matches": {"minItems": 1}}}}
+        ]
+      }
+    },
+    {
+      "name": "sker_search",
+      "description": "Search rule metadata locally and return locatable results; an empty result is distinct from a tool error.",
+      "annotations": {"readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false},
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": false,
+        "$defs": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}},
+        "required": ["query"],
+        "properties": {
+          "query": {"type": "string", "minLength": 1, "maxLength": 4000},
+          "paths": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 512}},
+          "domain": {"type": "string", "minLength": 1, "maxLength": 128},
+          "limit": {"type": "integer", "minimum": 1, "maximum": 100, "default": 20},
+          "bundle_sha256": {"$ref": "#/$defs/sha256"}
+        }
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": false,
+        "$defs": {
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "error": {"type": "object", "additionalProperties": false, "required": ["code", "message"], "properties": {"code": {"type": "string"}, "message": {"type": "string"}}},
+          "ruleMatch": {"type": "object", "additionalProperties": false, "required": ["rule_id", "title", "domain", "severity", "track", "paths", "summary", "score"], "properties": {"rule_id": {"type": "string"}, "title": {"type": "string"}, "domain": {"type": "string"}, "severity": {"enum": ["BLOCK", "WARN", "INFO"]}, "track": {"enum": ["deterministic", "semantic"]}, "paths": {"type": "array", "items": {"type": "string"}}, "summary": {"type": "string"}, "score": {"type": "number", "minimum": 0, "maximum": 1}}}
+        },
+        "required": ["status", "bundle_sha256", "results"],
+        "properties": {
+          "status": {"enum": ["matched", "no_match", "error"]},
+          "bundle_sha256": {"$ref": "#/$defs/sha256"},
+          "results": {"type": "array", "items": {"$ref": "#/$defs/ruleMatch"}},
+          "error": {"$ref": "#/$defs/error"}
+        },
+        "allOf": [
+          {"if": {"properties": {"status": {"const": "error"}}, "required": ["status"]}, "then": {"required": ["error"]}},
+          {"if": {"properties": {"status": {"const": "no_match"}}, "required": ["status"]}, "then": {"properties": {"results": {"maxItems": 0}}}},
+          {"if": {"properties": {"status": {"const": "matched"}}, "required": ["status"]}, "then": {"properties": {"results": {"minItems": 1}}}}
+        ]
+      }
+    },
+    {
+      "name": "sker_attest",
+      "description": "Locally finalize a credential before commit/PR submission. CI never issues or repairs this credential.",
+      "annotations": {"readOnlyHint": false, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false},
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": false,
+        "$defs": {
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "blake3": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "consultTraceEntry": {"type": "object", "additionalProperties": false, "required": ["consult_id", "occurred_at", "query_digest", "paths", "matched_rule_ids", "result_status"], "properties": {"consult_id": {"type": "string", "minLength": 1}, "occurred_at": {"type": "string", "format": "date-time"}, "query_digest": {"$ref": "#/$defs/blake3"}, "paths": {"type": "array", "items": {"type": "string"}}, "matched_rule_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}, "result_status": {"enum": ["matched", "no_match", "error"]}}},
+          "semanticVerdict": {"type": "object", "additionalProperties": false, "required": ["rule_id", "state", "declaration"], "properties": {"rule_id": {"type": "string", "minLength": 1}, "state": {"enum": ["comply", "not_triggered_in_logic", "exempt", "escalate"]}, "declaration": {"type": "string", "minLength": 1, "maxLength": 4000}, "rationale_digest": {"$ref": "#/$defs/blake3"}}}
+        },
+        "required": ["bundle_sha256", "diff_tree_hash", "consult_trace", "semantic_verdicts", "issuer", "created_at"],
+        "properties": {
+          "bundle_sha256": {"$ref": "#/$defs/sha256"},
+          "diff_tree_hash": {"$ref": "#/$defs/blake3"},
+          "consult_trace": {"type": "array", "items": {"$ref": "#/$defs/consultTraceEntry"}},
+          "semantic_verdicts": {"type": "array", "items": {"$ref": "#/$defs/semanticVerdict"}},
+          "issuer": {"enum": ["local_agent", "local_cli", "mcp", "hook", "sker_attest"]},
+          "created_at": {"type": "string", "format": "date-time"}
+        }
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": false,
+        "$defs": {
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "blake3": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "consultTraceEntry": {"type": "object", "additionalProperties": false, "required": ["consult_id", "occurred_at", "query_digest", "paths", "matched_rule_ids", "result_status"], "properties": {"consult_id": {"type": "string", "minLength": 1}, "occurred_at": {"type": "string", "format": "date-time"}, "query_digest": {"$ref": "#/$defs/blake3"}, "paths": {"type": "array", "items": {"type": "string"}}, "matched_rule_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}, "result_status": {"enum": ["matched", "no_match", "error"]}}},
+          "semanticVerdict": {"type": "object", "additionalProperties": false, "required": ["rule_id", "state", "declaration"], "properties": {"rule_id": {"type": "string", "minLength": 1}, "state": {"enum": ["comply", "not_triggered_in_logic", "exempt", "escalate"]}, "declaration": {"type": "string", "minLength": 1, "maxLength": 4000}, "rationale_digest": {"$ref": "#/$defs/blake3"}}},
+          "credential": {"type": "object", "additionalProperties": false, "required": ["schema_version", "bundle_sha256", "diff_tree_hash", "consult_trace", "semantic_verdicts", "issuer", "created_at", "credential_blake3"], "properties": {"schema_version": {"const": "sker.agent-credential/v1"}, "bundle_sha256": {"$ref": "#/$defs/sha256"}, "diff_tree_hash": {"$ref": "#/$defs/blake3"}, "consult_trace": {"type": "array", "items": {"$ref": "#/$defs/consultTraceEntry"}}, "semantic_verdicts": {"type": "array", "items": {"$ref": "#/$defs/semanticVerdict"}}, "issuer": {"enum": ["local_agent", "local_cli", "mcp", "hook", "sker_attest"]}, "created_at": {"type": "string", "format": "date-time"}, "credential_blake3": {"$ref": "#/$defs/blake3", "description": "BLAKE3 over RFC 8785 canonical JSON UTF-8 bytes of this credential with this field omitted."}}}
+        },
+        "required": ["status", "credential"],
+        "properties": {
+          "status": {"const": "created"},
+          "credential": {"$ref": "#/$defs/credential"}
+        }
+      }
+    },
+    {
+      "name": "sker_propose",
+      "description": "Create a pending rule proposal for human review; it does not update the active bundle.",
+      "annotations": {"readOnlyHint": false, "destructiveHint": false, "idempotentHint": false, "openWorldHint": false},
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": false,
+        "$defs": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}},
+        "required": ["entry", "rationale"],
+        "properties": {
+          "entry": {"$ref": "https://sker.dev/schemas/entry/v1.json"},
+          "rationale": {"type": "string", "minLength": 1, "maxLength": 8000},
+          "based_on_bundle_sha256": {"$ref": "#/$defs/sha256"}
+        }
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["status", "proposal_id", "state"],
+        "properties": {
+          "status": {"const": "accepted"},
+          "proposal_id": {"type": "string", "minLength": 1},
+          "state": {"const": "pending"}
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {"code": {"type": "string"}, "message": {"type": "string"}}
+    },
+    "ruleMatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rule_id", "title", "domain", "severity", "track", "paths", "summary", "score"],
+      "properties": {
+        "rule_id": {"type": "string"},
+        "title": {"type": "string"},
+        "domain": {"type": "string"},
+        "severity": {"enum": ["BLOCK", "WARN", "INFO"]},
+        "track": {"enum": ["deterministic", "semantic"]},
+        "paths": {"type": "array", "items": {"type": "string"}},
+        "summary": {"type": "string"},
+        "score": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    },
+    "consultTraceEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["consult_id", "occurred_at", "query_digest", "paths", "matched_rule_ids", "result_status"],
+      "properties": {
+        "consult_id": {"type": "string", "minLength": 1},
+        "occurred_at": {"type": "string", "format": "date-time"},
+        "query_digest": {"$ref": "#/$defs/blake3"},
+        "paths": {"type": "array", "items": {"type": "string"}},
+        "matched_rule_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "result_status": {"enum": ["matched", "no_match", "error"]}
+      }
+    },
+    "semanticVerdict": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rule_id", "state", "declaration"],
+      "properties": {
+        "rule_id": {"type": "string", "minLength": 1},
+        "state": {"enum": ["comply", "not_triggered_in_logic", "exempt", "escalate"]},
+        "declaration": {"type": "string", "minLength": 1, "maxLength": 4000},
+        "rationale_digest": {"$ref": "#/$defs/blake3"}
+      }
+    },
+    "credential": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "bundle_sha256", "diff_tree_hash", "consult_trace", "semantic_verdicts", "issuer", "created_at", "credential_blake3"],
+      "properties": {
+        "schema_version": {"const": "sker.agent-credential/v1"},
+        "bundle_sha256": {"$ref": "#/$defs/sha256"},
+        "diff_tree_hash": {"$ref": "#/$defs/blake3"},
+        "consult_trace": {"type": "array", "items": {"$ref": "#/$defs/consultTraceEntry"}},
+        "semantic_verdicts": {"type": "array", "items": {"$ref": "#/$defs/semanticVerdict"}},
+        "issuer": {"enum": ["local_agent", "local_cli", "mcp", "hook", "sker_attest"]},
+        "created_at": {"type": "string", "format": "date-time"},
+        "credential_blake3": {"$ref": "#/$defs/blake3", "description": "BLAKE3 over RFC 8785 canonical JSON UTF-8 bytes of this credential with this field omitted."}
+      }
+    }
+  }
+}

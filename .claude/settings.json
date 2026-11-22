@@ -1,0 +1,23 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "sker hook",
+            "type": "command"
+          }
+        ],
+        "matcher": ""
+      }
+    ]
+  },
+  "mcpServers": {
+    "sker": {
+      "args": [
+        "mcp"
+      ],
+      "command": "sker"
+    }
+  }
+}

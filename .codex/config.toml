@@ -1,0 +1,5 @@
+# sker:managed:start
+[mcp_servers.sker]
+command = "sker"
+args = ["mcp"]
+# sker:managed:end

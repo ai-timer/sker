@@ -3,6 +3,9 @@ name = "sker-ledger"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+description = "Sker Ledger: audit log and rule SNR telemetry server"
+homepage.workspace = true
+repository.workspace = true
 
 [dependencies]
 sker-schema = { path = "../../crates/sker-schema" }

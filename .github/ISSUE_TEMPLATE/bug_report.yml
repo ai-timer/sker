@@ -1,0 +1,48 @@
+name: 缺陷或误报反馈 (Bug / False Positive Report)
+description: 反馈 Sker 核心引擎、CLI、Action 或规约规则中的缺陷或误报
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈问题！请尽量提供详尽的信息，以便维护团队能够准确复现。
+  - type: dropdown
+    id: component
+    attributes:
+      label: 受影响组件 (Affected Component)
+      options:
+        - "sker-cli (命令行工具)"
+        - "sker-analyzer / ast-grep (分析引擎)"
+        - "sker-compiler (规则编译器)"
+        - "sker-retriever / consult (检索器)"
+        - "sker-mcp (MCP 服务)"
+        - "action (GitHub Action)"
+        - "sker-ledger (遥测账本)"
+        - "规约误报 (False Positive in Playbook)"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Sker 版本 (Sker Version)
+      placeholder: "e.g. v0.1.0-preview, git commit hash"
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 问题描述与最小复现步骤 (Description & Minimal Reproduction)
+      placeholder: |
+        1. 执行命令 `sker check ...`
+        2. 触发的代码片段如下：
+        ...
+        3. 得到的实际输出 vs 预期行为
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 诊断输出或日志 (Diagnostic Logs)
+      description: 可附上 `sker doctor` 的输出或报错堆栈
+      render: shell

@@ -3,6 +3,9 @@ name = "sker-analyzer"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+description = "Sker Analyzer: incremental diff analysis and rule checking"
+homepage.workspace = true
+repository.workspace = true
 
 [dependencies]
 sker-schema = { path = "../sker-schema" }
@@ -17,3 +20,7 @@ serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 anyhow.workspace = true
+
+[[bench]]
+name = "incremental_10k"
+harness = false

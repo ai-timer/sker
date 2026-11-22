@@ -1,0 +1,11 @@
+change: invoice-paid notification delivery
+producer_service: billing
+producer_languages: [go, yaml]
+publication:
+  mechanism: transactional_outbox
+  event: InvoicePaid
+  subscriber: notifications
+consumer:
+  service: notifications
+  idempotency_key: invoice_id
+signal_expected: true

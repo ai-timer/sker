@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Sker Governance Ledger</title>
+  <style>
+    body { font: 15px system-ui, -apple-system, sans-serif; max-width: 980px; margin: 40px auto; padding: 0 18px; color: #202733; background: #f5f7fa; }
+    h1 { font-size: 26px; margin-bottom: 4px; }
+    .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+    .card { background: white; border: 1px solid #dfe5ec; border-radius: 10px; padding: 16px; flex: 1; min-width: 190px; }
+    .card b { text-transform: capitalize; color: #4b5563; }
+    button, select, input { padding: 8px 12px; border: 1px solid #bbc5d1; border-radius: 6px; background: white; font: inherit; }
+    button { cursor: pointer; background: #2563eb; color: white; border-color: #1d4ed8; font-weight: 500; }
+    button:hover { background: #1d4ed8; }
+    button.secondary { background: white; color: #374151; border-color: #d1d5db; }
+    button.secondary:hover { background: #f3f4f6; }
+    table { width: 100%; border-collapse: collapse; background: white; margin-top: 18px; border-radius: 8px; overflow: hidden; border: 1px solid #e5e7eb; }
+    td, th { text-align: left; padding: 10px 12px; border-bottom: 1px solid #e5e7eb; }
+    th { background: #f9fafb; font-weight: 600; color: #374151; }
+    .muted { color: #687483; }
+    .auth-banner { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin-bottom: 20px; }
+    .auth-error { color: #dc2626; font-size: 13px; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <div class="header-bar">
+    <div>
+      <h1>Sker Governance Ledger</h1>
+      <p class="muted" style="margin: 4px 0 0 0;">Read-only governance signals. Notices never change rule state.</p>
+    </div>
+    <div id="auth-status">
+      <button id="logout-btn" class="secondary" style="display: none;" onclick="logoutDashboard()">Lock / Clear Token</button>
+    </div>
+  </div>
+
+  <div id="auth-panel" class="auth-banner" style="display: none;">
+    <h3 style="margin-top: 0; margin-bottom: 8px;">Authentication Required</h3>
+    <p class="muted" style="margin-top: 0; margin-bottom: 12px;">Please provide your <code>LEDGER_BEARER_TOKEN</code> to unlock dashboard metrics and rule health.</p>
+    <div style="display: flex; gap: 8px; align-items: center;">
+      <input type="password" id="token-input" placeholder="Enter Bearer Token" style="width: 320px;" onkeydown="if(event.key==='Enter') unlockDashboard()" />
+      <button onclick="unlockDashboard()">Unlock Dashboard</button>
+    </div>
+    <div id="auth-error-msg" class="auth-error" style="display: none;"></div>
+  </div>
+
+  <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px;">
+    <label for="window" class="muted" style="font-weight: 500;">Time Window:</label>
+    <select id="window" onchange="loadData()">
+      <option>7d</option>
+      <option selected>30d</option>
+      <option>90d</option>
+    </select>
+    <button class="secondary" onclick="loadData()">Refresh</button>
+  </div>
+
+  <div class="row" id="cards"></div>
+
+  <h2 style="margin-top: 32px; font-size: 20px;">Rule Health</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Rule</th>
+        <th>Status</th>
+        <th>Noise Rate</th>
+        <th>Samples</th>
+        <th>Notice</th>
+      </tr>
+    </thead>
+    <tbody id="notices"></tbody>
+  </table>
+
+  <script>
+    const TOKEN_KEY = 'sker_ledger_token';
+
+    function getToken() {
+      return sessionStorage.getItem(TOKEN_KEY) || '';
+    }
+
+    function unlockDashboard() {
+      const token = document.getElementById('token-input').value.trim();
+      if (!token) {
+        showAuthError('Please enter a valid Bearer Token.');
+        return;
+      }
+      sessionStorage.setItem(TOKEN_KEY, token);
+      hideAuthError();
+      loadData();
+    }
+
+    function logoutDashboard() {
+      sessionStorage.removeItem(TOKEN_KEY);
+      document.getElementById('token-input').value = '';
+      document.getElementById('auth-panel').style.display = 'block';
+      document.getElementById('logout-btn').style.display = 'none';
+      document.getElementById('cards').innerHTML = '<p class="muted">Dashboard locked. Please provide Bearer Token above.</p>';
+      document.getElementById('notices').innerHTML = '<tr><td colspan="5" class="muted">Dashboard locked.</td></tr>';
+    }
+
+    function showAuthError(msg) {
+      const el = document.getElementById('auth-error-msg');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    function hideAuthError() {
+      const el = document.getElementById('auth-error-msg');
+      el.style.display = 'none';
+    }
+
+    async function loadData() {
+      const token = getToken();
+      if (!token) {
+        document.getElementById('auth-panel').style.display = 'block';
+        document.getElementById('logout-btn').style.display = 'none';
+        document.getElementById('cards').innerHTML = '<p class="muted">Authentication required to view metrics.</p>';
+        document.getElementById('notices').innerHTML = '<tr><td colspan="5" class="muted">Authentication required.</td></tr>';
+        return;
+      }
+
+      const w = document.querySelector('#window').value;
+      const headers = { 'Authorization': 'Bearer ' + token };
+
+      try {
+        const [m, h] = await Promise.all([
+          fetch('/api/v1/metrics/overview?window=' + w, { headers }),
+          fetch('/api/v1/rules/health?window=' + w, { headers })
+        ]);
+
+        if (m.status === 401 || h.status === 401) {
+          logoutDashboard();
+          showAuthError('Authentication failed (HTTP 401): Invalid Bearer Token. Please re-enter.');
+          return;
+        }
+
+        if (!m.ok || !h.ok) {
+          document.querySelector('#cards').innerHTML = '<p>Ledger data unavailable.</p>';
+          return;
+        }
+
+        // Successfully authenticated
+        document.getElementById('auth-panel').style.display = 'none';
+        document.getElementById('logout-btn').style.display = 'inline-block';
+
+        const a = await m.json(), b = await h.json();
+        document.querySelector('#cards').innerHTML = a.metrics.map(x =>
+          `<section class="card">
+            <b>${x.key.replaceAll('_', ' ')}</b>
+            <div style="font-size: 24px; margin: 8px 0; font-weight: 600;">
+              ${x.unit === 'distribution' ? (x.distribution.reduce((n, d) => n + d.rule_count, 0) + ' active rules') : x.value === null ? 'No data' : Number(x.value).toLocaleString(undefined, { style: 'percent', maximumFractionDigits: 1 })}
+            </div>
+            <small class="muted">${x.unit === 'distribution' ? x.denominator + ' rules tracked' : x.numerator + ' / ' + x.denominator + ' · ' + x.sample_count + ' samples'}</small>
+          </section>`
+        ).join('');
+
+        document.querySelector('#notices').innerHTML = b.notices.map(x =>
+          `<tr>
+            <td><code>${x.rule_id}</code></td>
+            <td><span style="font-weight: 500;">${x.status}</span></td>
+            <td>${x.noise_rate === null ? '—' : (x.noise_rate * 100).toFixed(1) + '%'}</td>
+            <td>${x.sample_count}</td>
+            <td>${x.message}</td>
+          </tr>`
+        ).join('') || '<tr><td colspan="5" class="muted">No notices</td></tr>';
+      } catch (err) {
+        document.querySelector('#cards').innerHTML = '<p class="auth-error">Failed to connect to Ledger API.</p>';
+      }
+    }
+
+    loadData();
+  </script>
+</body>
+</html>

@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sker.dev/contracts/cli-ci/v1.json",
+  "title": "Sker CLI CI contract",
+  "contract_version": "1.0.0",
+  "command": {
+    "argv": ["sker", "check", "--ci", "--sarif", "<path>", "--json", "<path>"],
+    "options": {
+      "--ci": {"type": "boolean", "required": true, "description": "Run deterministic CI analysis against the supplied PR diff without requiring a prior local check or remote service."},
+      "--sarif": {"type": "path", "required": true, "description": "Write SARIF 2.1.0 output atomically to this path."},
+      "--json": {"type": "path", "required": true, "description": "Write a CheckReport JSON document atomically to this path."}
+    },
+    "exit_codes": {
+      "0": "Analysis completed; no deterministic blocking finding exists. Semantic findings may be present and are represented in CheckReport without being misreported as deterministic violations.",
+      "1": "Analysis completed; at least one deterministic BLOCK finding exists. Both requested reports are still written.",
+      "2": "Analysis could not be completed or invocation/output is invalid (including invalid arguments, missing bundle, repository/diff failure, or report write failure). A partial report must not be represented as a complete successful analysis."
+    },
+    "report_write_rule": "Both outputs are written to temporary sibling files and atomically renamed only after serialization succeeds. A write failure returns exit code 2."
+  },
+  "check_report_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["schema_version", "status", "bundle_sha256", "diff_tree_hash", "changed_line_count", "findings", "analysis"],
+    "properties": {
+      "schema_version": {"const": "sker.check-report/v1"},
+      "status": {"enum": ["passed", "blocked", "incomplete"]},
+      "bundle_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+      "diff_tree_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+      "changed_line_count": {"type": "integer", "minimum": 0},
+      "findings": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["rule_id", "path", "start_line", "end_line", "track", "severity", "disposition", "message", "alternatives"],
+          "properties": {
+            "rule_id": {"type": "string", "minLength": 1},
+            "path": {"type": "string", "minLength": 1},
+            "start_line": {"type": "integer", "minimum": 1},
+            "end_line": {"type": "integer", "minimum": 1},
+            "track": {"enum": ["deterministic", "semantic"]},
+            "severity": {"enum": ["BLOCK", "WARN", "INFO"]},
+            "disposition": {"enum": ["blocked", "warning", "pending_semantic", "baseline_suppressed", "exempt"]},
+            "message": {"type": "string", "minLength": 1},
+            "alternatives": {"type": "array", "items": {"type": "string", "minLength": 1}},
+            "baseline_anchor": {"type": ["string", "null"]}
+          }
+        }
+      },
+      "analysis": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["complete", "unsupported_paths", "warnings"],
+        "properties": {
+          "complete": {"type": "boolean"},
+          "unsupported_paths": {"type": "array", "items": {"type": "string"}},
+          "warnings": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "allOf": [
+      {"if": {"properties": {"status": {"const": "passed"}}, "required": ["status"]}, "then": {"properties": {"analysis": {"properties": {"complete": {"const": true}}}}}},
+      {"if": {"properties": {"status": {"const": "incomplete"}}, "required": ["status"]}, "then": {"properties": {"analysis": {"properties": {"complete": {"const": false}}}}}}
+    ]
+  }
+}

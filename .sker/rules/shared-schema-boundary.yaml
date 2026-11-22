@@ -1,0 +1,29 @@
+schema_version: sker.entry/v1
+rule_id: architecture.shared-schema-boundary
+version: 1.0.0
+title: Crates communicate through shared schema without ad hoc private cross-crate data types
+domain: architecture.schema-boundaries
+description: All workspace crates must exchange data through types defined by sker-schema. Changes to shared contracts must be represented in sker-schema.
+severity: WARN
+track: semantic
+scope:
+  include_paths:
+    - "crates/**/*.rs"
+    - "apps/**/*.rs"
+signals:
+  - signal_id: private-cross-crate-contract
+    languages: [rust]
+    description: Public data structure declaration in internal crate
+    pattern: "pub struct $NAME { $$$FIELDS }"
+exemptions: []
+overrides: []
+fixtures: []
+compliant_alternatives:
+  - "Expose shared data models and traits in sker-schema"
+lifecycle:
+  kind: ordinary
+  cooldown_hours: 24
+consult:
+  synonyms: ["shared schema", "cross-crate contract", "sker-schema boundary"]
+  keywords: ["schema", "boundary", "crate"]
+tags: ["rust", "semantic", "architecture"]

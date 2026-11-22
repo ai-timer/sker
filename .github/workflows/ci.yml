@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Workspace Tests & Compliance
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Verify zero C-linked OpenSSL
+        run: |
+          count=$(cargo tree -i openssl-sys 2>&1 | grep -v "error: package ID.*not found" | grep -c "openssl-sys" || true)
+          if [ "$count" -ne 0 ]; then
+            echo "Error: openssl-sys found in dependency tree! Sker requires pure-Rust dependencies."
+            cargo tree -i openssl-sys
+            exit 1
+          fi
+          echo "Confirmed: zero C-linked openssl-sys in workspace."
+
+      - name: Run Cargo Fmt Check
+        run: cargo fmt --all -- --check
+
+      - name: Run Cargo Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Run Cargo Tests
+        run: cargo test --workspace
+
+      - name: Run Action Tests
+        run: bash action/scripts/test-action.sh
+
+      - name: Build Sker CLI Release
+        run: cargo build --release -p sker-cli
+
+      - name: Compile Sker Bundle
+        run: ./target/release/sker compile --repo .
+
+      - name: Run Dogfooding Sker CI Check
+        run: ./target/release/sker check --ci --sarif sker-results.sarif --json sker-check-report.json --repo .

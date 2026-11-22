@@ -1,0 +1,9 @@
+# Sker Codeowners file
+# Critical governance policies, specifications, and root dependencies require review by maintainers
+
+/.sker/              @ai-timer
+/.specify/           @ai-timer
+/specs/              @ai-timer
+/Cargo.toml          @ai-timer
+/dist-workspace.toml @ai-timer
+/.github/workflows/  @ai-timer

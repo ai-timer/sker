@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [{
+    "tool": {"driver": {"name": "sker", "rules": []}},
+    "results": [{
+      "ruleId": "R-SEM",
+      "level": "warning",
+      "message": {"text": "Review high-risk semantic behavior"},
+      "locations": [{"physicalLocation": {"artifactLocation": {"uri": "src/a.rs"}, "region": {"startLine": 8}}}],
+      "properties": {"track": "semantic", "disposition": "pending_semantic"}
+    }]
+  }]
+}
