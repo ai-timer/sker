@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master, main]
   pull_request:
-    branches: [main]
+    branches: [master, main]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -30,8 +30,7 @@ jobs:
 
       - name: Verify zero C-linked OpenSSL
         run: |
-          count=$(cargo tree -i openssl-sys 2>&1 | grep -v "error: package ID.*not found" | grep -c "openssl-sys" || true)
-          if [ "$count" -ne 0 ]; then
+          if cargo tree -i openssl-sys >/dev/null 2>&1; then
             echo "Error: openssl-sys found in dependency tree! Sker requires pure-Rust dependencies."
             cargo tree -i openssl-sys
             exit 1
@@ -52,6 +51,9 @@ jobs:
 
       - name: Build Sker CLI Release
         run: cargo build --release -p sker
+
+      - name: Run Real Binary CLI Contract Tests
+        run: bash action/scripts/test-cli-contract.sh
 
       - name: Compile Sker Bundle
         run: ./target/release/sker compile --repo .
