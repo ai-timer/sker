@@ -66,6 +66,9 @@ pub async fn run(command: Command) -> Result<()> {
             semantic,
             output,
         } => interaction::attest(&repo, &semantic, output.as_deref()),
+        Command::VerifyCredential { credential, report } => {
+            interaction::verify_credential(&credential, &report)
+        }
         Command::Propose {
             entry,
             rationale,

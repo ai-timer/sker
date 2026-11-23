@@ -122,6 +122,65 @@ pub fn attest(path: &Path, semantic: &str, output: Option<&Path>) -> Result<()> 
     Ok(())
 }
 
+pub fn verify_credential(credential_path: &Path, report_path: &Path) -> Result<()> {
+    let credential: AgentCredential = serde_json::from_str(
+        &fs::read_to_string(credential_path)
+            .with_context(|| format!("cannot read credential {}", credential_path.display()))?,
+    )
+    .context("credential is malformed")?;
+    let report: CheckReport = serde_json::from_str(
+        &fs::read_to_string(report_path)
+            .with_context(|| format!("cannot read CheckReport {}", report_path.display()))?,
+    )
+    .context("CheckReport is malformed")?;
+
+    if credential.schema_version != "sker.agent-credential/v1" {
+        bail!("unsupported credential schema_version");
+    }
+    if credential.created_at.trim().is_empty() {
+        bail!("credential is missing created_at");
+    }
+    let digest = &credential.credential_blake3;
+    if digest.len() != 64
+        || !digest
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    {
+        bail!("credential_blake3 must be 64 lowercase hex characters");
+    }
+    for verdict in &credential.semantic_verdicts {
+        if verdict.declaration.trim().is_empty() {
+            bail!(
+                "semantic verdict for '{}' has an empty declaration",
+                verdict.rule_id
+            );
+        }
+        if verdict.state == SemanticVerdictState::Escalate {
+            bail!(
+                "semantic verdict for '{}' requires escalation",
+                verdict.rule_id
+            );
+        }
+    }
+    let required: Vec<String> = report
+        .findings
+        .iter()
+        .filter(|f| {
+            f.track == RuleTrack::Semantic && f.disposition == FindingDisposition::PendingSemantic
+        })
+        .map(|f| f.rule_id.clone())
+        .collect();
+    sker_analyzer::verify_credential(
+        &credential,
+        &report.bundle_sha256,
+        &report.diff_tree_hash,
+        &required,
+    )
+    .map_err(|e| anyhow::anyhow!("credential verification failed: {e:?}"))?;
+    println!("credential verified");
+    Ok(())
+}
+
 pub fn propose(path: &Path, entry: &Path, rationale: &str) -> Result<()> {
     let repo = find_repo(path)?;
     let b = bundle(&repo)?;

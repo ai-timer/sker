@@ -40,8 +40,20 @@ fi
 if [[ "$actor" == agent ]]; then
   [[ -f "$credential" ]] || fail "Agent PR is missing its locally issued credential"
   [[ -f "$report" ]] || fail "The recomputed CheckReport is missing"
-  [[ "$(command -v b3sum || true)" ]] || fail "BLAKE3 verifier is unavailable; refusing to accept Agent credential"
-  node - "$credential" "$report" <<'NODE' || fail "Agent credential is stale, malformed, or missing a required semantic declaration"
+  sker_bin="${SKER_BIN:-${INPUT_SKER_PATH:-}}"
+  # Capability probe by output: mock binaries may exit 0 for unknown subcommands.
+  verify_help=""
+  if [[ -n "$sker_bin" ]]; then
+    verify_help="$("$sker_bin" verify-credential --help 2>/dev/null || true)"
+  fi
+  if [[ "$verify_help" == *"--credential"* ]]; then
+    # Real sker binary: built-in pure-Rust BLAKE3 + RFC 8785 verification, no external b3sum.
+    "$sker_bin" verify-credential --credential "$credential" --report "$report" >/dev/null \
+      || fail "Agent credential is stale, tampered, malformed, or missing a required semantic declaration"
+  else
+    # Legacy fallback for mock-binary test environments that lack a real sker executable.
+    [[ "$(command -v b3sum || true)" ]] || fail "BLAKE3 verifier is unavailable; refusing to accept Agent credential"
+    node - "$credential" "$report" <<'NODE' || fail "Agent credential is stale, malformed, or missing a required semantic declaration"
 const fs = require('node:fs');
 const c = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const report = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
@@ -57,7 +69,7 @@ for (const v of c.semantic_verdicts) {
 }
 for (const f of report.findings) if (f.track === 'semantic' && f.disposition === 'pending_semantic' && !byRule.has(f.rule_id)) process.exit(1);
 NODE
-  canonical="$(node - "$credential" <<'NODE'
+    canonical="$(node - "$credential" <<'NODE'
 const fs = require('node:fs');
 const c = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 delete c.credential_blake3;
@@ -74,12 +86,13 @@ function canon(v) {
 process.stdout.write(canon(c));
 NODE
 )" || fail "Unable to canonicalize the submitted credential"
-  actual="$(printf '%s' "$canonical" | b3sum | awk '{print $1}')"
-  expected="$(node - "$credential" <<'NODE'
+    actual="$(printf '%s' "$canonical" | b3sum | awk '{print $1}')"
+    expected="$(node - "$credential" <<'NODE'
 const c = require(process.argv[2]); process.stdout.write(c.credential_blake3);
 NODE
 )"
-  [[ "$actual" == "$expected" ]] || fail "Agent credential BLAKE3 digest does not match"
+    [[ "$actual" == "$expected" ]] || fail "Agent credential BLAKE3 digest does not match"
+  fi
 fi
 
 case "$code" in

@@ -135,6 +135,25 @@ pub enum Command {
         output: Option<PathBuf>,
     },
 
+    #[command(
+        about = "Verify an agent credential against a CheckReport using built-in BLAKE3 (no external b3sum)"
+    )]
+    VerifyCredential {
+        #[arg(
+            long,
+            default_value = ".sker/credential.json",
+            help = "Path to the agent credential file"
+        )]
+        credential: PathBuf,
+
+        #[arg(
+            long,
+            default_value = "sker-check-report.json",
+            help = "Path to the recomputed CheckReport JSON"
+        )]
+        report: PathBuf,
+    },
+
     #[command(about = "Propose a new rule entry from incident rationale")]
     Propose {
         #[arg(help = "Path to draft rule entry YAML file")]
