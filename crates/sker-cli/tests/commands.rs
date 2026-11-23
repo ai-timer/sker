@@ -34,16 +34,40 @@ fn clap_exposes_expected_command_tree() {
 
     // Verify slim command help structure
     for cmd in [
-        "compile", "check", "consult", "search", "attest", "propose", "replay", "init", "agent",
-        "doctor", "baseline", "mcp", "hook",
+        "compile",
+        "check",
+        "consult",
+        "search",
+        "attest",
+        "verify-credential",
+        "propose",
+        "replay",
+        "init",
+        "agent",
+        "doctor",
+        "baseline",
+        "mcp",
+        "hook",
     ] {
         assert!(help.contains(cmd), "help missing subcommand {cmd}");
     }
 
     // 3. Verify all subcommands exist and have non-empty about descriptions
     let subcommands = [
-        "compile", "check", "consult", "search", "attest", "propose", "replay", "init", "agent",
-        "doctor", "baseline", "mcp", "hook",
+        "compile",
+        "check",
+        "consult",
+        "search",
+        "attest",
+        "verify-credential",
+        "propose",
+        "replay",
+        "init",
+        "agent",
+        "doctor",
+        "baseline",
+        "mcp",
+        "hook",
     ];
     for command in subcommands {
         assert!(
@@ -915,4 +939,120 @@ fn attest_default_args_does_not_crash_on_parsing() {
     assert_eq!(cred["schema_version"], "sker.agent-credential/v1");
 
     let _ = fs::remove_dir_all(repo);
+}
+
+#[test]
+fn verify_credential_accepts_valid_and_rejects_tampered_or_escalated() {
+    let repo = root();
+    fs::create_dir_all(repo.join(".sker/rules")).unwrap();
+    let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../examples/sample-playbook/rules/go-no-logging.yaml");
+    fs::copy(source, repo.join(".sker/rules/go-no-logging.yaml")).unwrap();
+    let git = |args: &[&str]| {
+        let out = Command::new("git")
+            .args(args)
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8_lossy(&out.stdout).trim().to_string()
+    };
+    git(&["init", "-q"]);
+    git(&["config", "user.email", "sker-test@example.invalid"]);
+    git(&["config", "user.name", "Sker Test"]);
+    let compile = Command::new(env!("CARGO_BIN_EXE_sker"))
+        .args(["compile", "--repo"])
+        .arg(&repo)
+        .output()
+        .unwrap();
+    assert!(compile.status.success());
+    git(&["add", "."]);
+    git(&["commit", "-qm", "initial"]);
+    let base = git(&["rev-parse", "HEAD"]);
+    fs::write(repo.join("test.txt"), "hello\n").unwrap();
+    git(&["add", "."]);
+    git(&["commit", "-qm", "change"]);
+
+    let out_dir = root();
+    let report = out_dir.join("report.json");
+    let check = Command::new(env!("CARGO_BIN_EXE_sker"))
+        .args(["check", "--ci", "--base", &base, "--json"])
+        .arg(&report)
+        .arg("--sarif")
+        .arg(out_dir.join("out.sarif"))
+        .arg("--repo")
+        .arg(&repo)
+        .output()
+        .unwrap();
+    assert!(
+        check.status.success(),
+        "{}",
+        String::from_utf8_lossy(&check.stderr)
+    );
+
+    let cred = out_dir.join("credential.json");
+    let attest = Command::new(env!("CARGO_BIN_EXE_sker"))
+        .args(["attest", "--repo"])
+        .arg(&repo)
+        .arg("--output")
+        .arg(&cred)
+        .env("GITHUB_BASE_SHA", &base)
+        .output()
+        .unwrap();
+    assert!(
+        attest.status.success(),
+        "{}",
+        String::from_utf8_lossy(&attest.stderr)
+    );
+
+    let verify = |credential: &std::path::Path| {
+        Command::new(env!("CARGO_BIN_EXE_sker"))
+            .arg("verify-credential")
+            .arg("--credential")
+            .arg(credential)
+            .arg("--report")
+            .arg(&report)
+            .output()
+            .unwrap()
+    };
+    assert!(
+        verify(&cred).status.success(),
+        "valid credential must verify without external b3sum"
+    );
+
+    let mut tampered: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&cred).unwrap()).unwrap();
+    tampered["credential_blake3"] = serde_json::Value::String("0".repeat(64));
+    let tampered_path = out_dir.join("tampered.json");
+    fs::write(&tampered_path, serde_json::to_vec(&tampered).unwrap()).unwrap();
+    assert!(
+        !verify(&tampered_path).status.success(),
+        "tampered digest must be rejected"
+    );
+
+    let escalated = out_dir.join("escalated.json");
+    let attest_escalate = Command::new(env!("CARGO_BIN_EXE_sker"))
+        .args(["attest", "--repo"])
+        .arg(&repo)
+        .args([
+            "--semantic",
+            r#"[{"rule_id":"R-SEM","state":"escalate","declaration":"needs human review"}]"#,
+        ])
+        .arg("--output")
+        .arg(&escalated)
+        .env("GITHUB_BASE_SHA", &base)
+        .output()
+        .unwrap();
+    assert!(attest_escalate.status.success());
+    assert!(
+        !verify(&escalated).status.success(),
+        "escalate verdict must be rejected"
+    );
+
+    let _ = fs::remove_dir_all(repo);
+    let _ = fs::remove_dir_all(out_dir);
 }

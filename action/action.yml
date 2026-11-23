@@ -60,15 +60,11 @@ runs:
         INPUT_REPORT_FILE: ${{ inputs.report-file }}
       run: bash "${{ github.action_path }}/scripts/run-check.sh"
       continue-on-error: true
-    - name: Install BLAKE3 verifier
-      if: always() && steps.classify.outputs.actor == 'agent'
-      uses: taiki-e/install-action@v2
-      with:
-        tool: b3sum
     - name: Validate Agent credential and gate
       if: always()
       shell: bash
       env:
+        INPUT_SKER_PATH: ${{ inputs.sker-path }}
         INPUT_CREDENTIAL_FILE: ${{ inputs.credential-file }}
         INPUT_REPORT_FILE: ${{ inputs.report-file }}
         SKER_EXIT_CODE: ${{ steps.sker-check.outputs.exit_code }}

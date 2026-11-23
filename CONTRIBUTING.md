@@ -9,7 +9,7 @@
 Sker 遵循 **纯 Rust、零外部 C 依赖** 架构原则，不需要本地安装 OpenSSL、libgit2 或 C 编译链：
 
 - **Rust 工具链**: Rust 1.85+（Edition 2024）
-- **依赖检查工具**: `b3sum`（BLAKE3 校验，可选）、`cargo-dist`（发布工作流验证，可选）
+- **依赖检查工具**: `cargo-dist`（发布工作流验证，可选）；BLAKE3 凭据校验由 `sker verify-credential` 内置完成，无需外部 `b3sum`
 
 ```bash
 # 克隆仓库

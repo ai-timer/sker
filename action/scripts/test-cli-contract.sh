@@ -5,6 +5,7 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 action_dir="$(cd "$script_dir/.." && pwd)"
 repo_root="$(cd "$action_dir/.." && pwd)"
 sker_bin="${SKER_BIN:-$repo_root/target/release/sker}"
+export SKER_BIN="$sker_bin"
 
 if [[ ! -x "$sker_bin" ]]; then
   echo "Building release sker binary..."
